@@ -36,7 +36,7 @@ redirectCommand
 redirectCommand defaultCommand commands [("q", Just query)] = case tokenized of
   (x:_) -> fromMaybe  
     runDefaultCommand
-    ( (commandAction <$> (HashMap.lookup x commands))
+    ( (commandAction <$> HashMap.lookup x commands)
       <*> return tokenized
     )
   _ -> runDefaultCommand
