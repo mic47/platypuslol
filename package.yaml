@@ -4,7 +4,7 @@ github:              "mic47/platypuslol"
 license:             BSD3
 author:              "Michal Nánási"
 maintainer:          "michal.nanasi@gmail.com"
-copyright:           "MIT license"
+copyright:           "MIT License"
 
 extra-source-files:
 - README.md
