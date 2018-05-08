@@ -3,15 +3,15 @@ module Platypuslol.RedirectServer
   ) where
 
 import Network.Wai
-import Network.HTTP.Types (status400, status404)
+import Network.HTTP.Types (status400, status404, status302)
 import Data.Text (Text, unpack)
-import Data.Text.Encoding (decodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
 import Platypuslol.AmbiguousParser
 import Platypuslol.Types
 
 redirectServer
-  :: (Text -> Response)
+  :: (Text -> Action)
   -> Command
   -> Request
   -> (Response -> IO ResponseReceived)
@@ -27,12 +27,12 @@ redirectServer defaultRedirect commands req respond = respond $
     toText (x, y) = (decodeUtf8 x, decodeUtf8 <$> y)
 
 redirectCommand
-  :: (Text -> Response)
+  :: (Text -> Action)
   -> Command
   -> [(Text, Maybe Text)]
   -> Response
 redirectCommand defaultResponse commands [("q", Just query)] = 
-  case parseAll commands (unpack query) of
+  actionToResponse $ case parseAll commands (unpack query) of
     [] -> defaultResponse query
     ((_, _, x):_) -> x -- TODO: warn about multiple options
 redirectCommand _ _ _ = wrongQuery
@@ -50,3 +50,13 @@ notFound = responseBuilder
   [ ("Content-Type", "text/plain")
   ]
   "Page not found."
+
+actionToResponse :: Action -> Response
+actionToResponse (UrlRedirect destination) = responseBuilder
+  status302
+  [ ("Location"
+    , encodeUtf8 destination
+    )
+  ]
+  mempty
+

@@ -4,12 +4,11 @@ module Platypuslol.Commands
   ) where
 
 import Data.Text (Text)
-import Network.Wai
 
 import Platypuslol.AmbiguousParser
 import Platypuslol.Types
 
-defaultCommand :: Text -> Response
+defaultCommand :: Text -> Action
 defaultCommand = urlRedirect "https://www.google.com/search?q={query}"
 
 simpleRedirect :: String -> Text -> Command
