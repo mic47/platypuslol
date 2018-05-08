@@ -74,6 +74,8 @@ library:
   source-dirs: src
   dependencies:
   - blaze-builder
+  - blaze-html
+  - blaze-markup
   - http-types
   - parsec
   - text

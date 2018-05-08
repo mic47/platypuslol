@@ -13,6 +13,7 @@ import Platypuslol.Util
 
 data Action 
   = UrlRedirect Text
+  deriving (Show)
 
 -- TODO: remove strings
 type Command = AmbiguousParser (String, Text, Action)

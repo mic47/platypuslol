@@ -11,7 +11,7 @@ import Platypuslol.RedirectServer
 main :: IO ()
 main = do
   -- TODO: parse options
-  config <- read <$> readFile "/home/mic/.platypus.config"
+  config <- (read <$> readFile "/home/mic/.platypus.conf")
     `catch` \(_ :: SomeException) -> (return [])
   let port = 3000
   putStrLn $ "Listening on port " ++ show port
