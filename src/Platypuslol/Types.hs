@@ -1,9 +1,9 @@
 module Platypuslol.Types
   ( UsageTarget(..)
   , Command(..)
-  , Commands
-  , mkUrlRedirectCommand
-  , mkCommands
+  , singleParam
+  , urlRedirect
+  , mkCommand
   ) where
 
 import Data.HashMap.Strict (HashMap)
@@ -11,8 +11,11 @@ import qualified Data.HashMap.Strict as HashMap
 import Network.HTTP.Types (status302)
 import Network.Wai
 
-import Data.Text (Text)
+import Data.Text (Text, replace, pack)
 import Data.Text.Encoding (encodeUtf8)
+
+import Platypuslol.AmbiguousParser
+import Platypuslol.Util
 
 data UsageTarget 
   = BrowserRedirect
@@ -20,33 +23,29 @@ data UsageTarget
   | ChatBot
   deriving (Show)
 
-data Command = Command
-  -- TODO: should use some fancy parsers
-  { commandPrefixes :: [Text]
-  , commandAction :: [Text] -> Response
-  , commandTarget :: UsageTarget
-  }
+-- TODO: remove strings
+type Command = AmbiguousParser (String, Text, Response)
 
-type Commands = HashMap Text Command
+singleParam :: AmbiguousParser a -> AmbiguousParser (a, Text)
+singleParam = fmap (fmap pack) . (`spaced` eatAll)
 
-mkUrlRedirectCommand :: [Text] -> ([Text] -> Text) -> Command
-mkUrlRedirectCommand prefixes action = Command
-  { commandPrefixes = prefixes
-  , commandTarget = BrowserRedirect
-  , commandAction = \x -> responseBuilder
-    status302
-    [ ("Location"
-      , encodeUtf8 $ action x
-      )
-    ]
-    mempty
-  }
+mkCommand 
+  :: AmbiguousParser (a, b)
+  -> (b -> s)
+  -> (b -> c) 
+  -> AmbiguousParser (a, s, c)
+mkCommand commandWithParam showable fun = do
+  cwp <- commandWithParam
+  pure (fst cwp, showable $ snd cwp, fun $ snd cwp)
 
-mkCommands :: [Command] -> Commands
-mkCommands = HashMap.fromList 
-  . mconcat 
-  . map 
-    (\x -> map 
-      (\y -> (y, x)) 
-      (commandPrefixes x)
+urlRedirect :: Text -> Text -> Response
+urlRedirect template query = responseBuilder
+  status302
+  [ ("Location"
+    , encodeUtf8 $ replace
+      "{query}"
+      (urlEncodeText query)
+      template
     )
+  ]
+  mempty

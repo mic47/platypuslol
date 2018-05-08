@@ -3,41 +3,36 @@ module Platypuslol.Commands
   , defaultCommand
   ) where
 
-import Data.Monoid
+import Data.Text (Text)
+import Network.Wai
 
+import Platypuslol.AmbiguousParser
 import Platypuslol.Types
-import Platypuslol.Util
 
--- | g, or google is for searching google
-defaultCommand :: Command
-defaultCommand = mkUrlRedirectCommand
-  ["g", "google"]
-  (\query ->
-    "https://www.google.sk/search?q="
-    <> urlEncodeQuery (drop 1 query)
-  )
+defaultCommand :: Text -> Response
+defaultCommand = urlRedirect "https://www.google.com/search?q={query}"
 
-commands :: Commands
-commands = mkCommands $
-  [ defaultCommand
-  -- hoo for hoogle on stackage.
-  , mkUrlRedirectCommand
-    ["hoo", "hoogle"]
-    (\query ->
-      "https://www.stackage.org/lts-10.8/hoogle?q="
-      <> urlEncodeQuery (drop 1 query)
+simpleRedirect :: String -> Text -> Command
+simpleRedirect command redirectTemplate = mkCommand
+  (singleParam $ prefixSentence' command)
+  id
+  (urlRedirect redirectTemplate)
+
+commands :: [(String, Text)] -> Command
+commands fromConfig = anyOf $ map (uncurry simpleRedirect) $
+  [ ( "google"
+    , "https://www.google.com/search?q={query}"
     )
-  -- loo for local hoogle
-  , mkUrlRedirectCommand
-    ["loo", "loogle"]
-    (\query ->
-      "http://localhost:8080/?hoogle="
-      <> urlEncodeQuery (drop 1 query)
+  , ( "hoogle"
+    , "https://www.stackage.org/lts-10.8/hoogle?q={query}"
     )
-  , mkUrlRedirectCommand
-    ["ss"]
-    (\query ->
-      "https://www.scala-lang.org/api/current/scala/?search="
-      <> urlEncodeQuery (drop 1 query)
+  , ( "local hoogle"
+    , "http://localhost:8080/?hoogle={query}"
     )
-  ]
+  , ( "search scala docs"
+    , "https://www.scala-lang.org/api/current/scala/?search={query}"
+    )
+  , ( "search scala types"
+    , "http://scala-search.org/?m=org.scala-lang%3Ascala-library%3A2.11.7&m=org.scalaz%3Ascalaz-core_2.11%3A7.1.1&q={query}"
+    )
+  ] ++ fromConfig

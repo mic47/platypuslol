@@ -73,13 +73,14 @@ default-extensions: [
 library:
   source-dirs: src
   dependencies:
-  - warp
-  - wai
-  - text
-  - http-types
   - blaze-builder
-  - utf8-string
+  - http-types
+  - parsec
+  - text
   - unordered-containers
+  - utf8-string
+  - wai
+  - warp
 
 
 executables:
