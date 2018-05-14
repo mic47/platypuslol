@@ -30,9 +30,16 @@ mkCommand commandWithParam showable fun = do
   cwp <- commandWithParam
   pure (fst cwp, showable $ snd cwp, fun $ snd cwp)
 
-urlRedirect :: Text -> Text -> Action
-urlRedirect template query = UrlRedirect $ replace
-  "{query}"
-  (urlEncodeText query)
+-- TODO: this will probably have existing implementation
+-- in the standard library. 
+-- TODO2: use haystack.
+urlRedirect :: Text -> [(Text, Text)] -> Action
+urlRedirect template replacements = UrlRedirect $ foldl
+  (\template' (haystack, replacement) -> replace
+    haystack
+    (urlEncodeText replacement)
+    template'
+  )
   template
+  replacements
 

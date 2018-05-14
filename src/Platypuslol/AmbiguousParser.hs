@@ -1,4 +1,4 @@
-module Platypuslol.AmbiguousParser 
+module Platypuslol.AmbiguousParser
   ( AmbiguousParser
   , parseAll
   , char
@@ -9,12 +9,15 @@ module Platypuslol.AmbiguousParser
   , many
   , many1
   , eatAll
+  , word
+  , anyString
   , prefixSentence
   , prefixSentence'
   , spaced
   , separated
   ) where
 
+import Control.Arrow
 import Data.List
 
 newtype AmbiguousParser a = AmbiguousParser { parse :: String -> [(a, String)]}
@@ -27,7 +30,7 @@ instance Functor AmbiguousParser where
 
 instance Applicative AmbiguousParser where
   pure x = AmbiguousParser $ \a -> [(x, a)]
-  (AmbiguousParser pf) <*> (AmbiguousParser px) = AmbiguousParser $ \s -> 
+  (AmbiguousParser pf) <*> (AmbiguousParser px) = AmbiguousParser $ \s ->
     [ (f x, rest2)
     | (f, rest1) <- pf s
     , (x, rest2) <- px rest1
@@ -37,7 +40,7 @@ option :: AmbiguousParser a -> AmbiguousParser a -> AmbiguousParser a
 option p q = anyOf [p, q]
 
 char :: Char -> AmbiguousParser Char
-char c = AmbiguousParser 
+char c = AmbiguousParser
   (\case
     x:xs | x == c -> [(x, xs)]
     _ -> []
@@ -51,7 +54,7 @@ string (x:xs) = do
   return $ x':xs'
 
 anyOf :: [AmbiguousParser a] -> AmbiguousParser a
-anyOf parsers = AmbiguousParser $ \s -> mconcat 
+anyOf parsers = AmbiguousParser $ \s -> mconcat
   ( map
     (\p -> parse p s)
     parsers
@@ -75,6 +78,20 @@ prefix x = anyOf $ map (fmap (const x) . string) $ reverse $ drop 1 $ inits x
 
 eatAll :: AmbiguousParser String
 eatAll = AmbiguousParser $ \x -> [(x, "")]
+
+word :: AmbiguousParser String
+word = AmbiguousParser $ \x ->
+  [( takeWhile (/= ' ') x
+  , drop 1 $ dropWhile (/= ' ') x
+  )]
+
+
+anyString :: AmbiguousParser String
+anyString = AmbiguousParser splits
+
+splits :: [a] -> [([a], [a])]
+splits [] = []
+splits (a:as) = ([a], as) : (map (first (a:)) $ splits as)
 
 prefixSentence :: [String] -> AmbiguousParser [String]
 prefixSentence [] = pure []
