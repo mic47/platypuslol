@@ -1,52 +1,46 @@
 module Platypuslol.Types
-  ( UsageTarget(..)
-  , Command(..)
-  , Commands
-  , mkUrlRedirectCommand
-  , mkCommands
+  ( Command
+  , singleParam
+  , urlRedirect
+  , mkCommand
+  , Action(..)
   ) where
 
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
-import Network.HTTP.Types (status302)
-import Network.Wai
+import Data.List
+import Data.Text (Text, replace, pack)
 
-import Data.Text (Text)
-import Data.Text.Encoding (encodeUtf8)
+import Platypuslol.AmbiguousParser
+import Platypuslol.Util
 
-data UsageTarget 
-  = BrowserRedirect
-  | ApplicationLauncher
-  | ChatBot
+data Action 
+  = UrlRedirect Text
   deriving (Show)
 
-data Command = Command
-  -- TODO: should use some fancy parsers
-  { commandPrefixes :: [Text]
-  , commandAction :: [Text] -> Response
-  , commandTarget :: UsageTarget
-  }
+-- TODO: remove strings
+type Command = AmbiguousParser (String, Text, Action)
 
-type Commands = HashMap Text Command
+singleParam :: AmbiguousParser a -> AmbiguousParser (a, Text)
+singleParam = fmap (fmap pack) . (`spaced` eatAll)
 
-mkUrlRedirectCommand :: [Text] -> ([Text] -> Text) -> Command
-mkUrlRedirectCommand prefixes action = Command
-  { commandPrefixes = prefixes
-  , commandTarget = BrowserRedirect
-  , commandAction = \x -> responseBuilder
-    status302
-    [ ("Location"
-      , encodeUtf8 $ action x
-      )
-    ]
-    mempty
-  }
+mkCommand 
+  :: AmbiguousParser (a, b)
+  -> (b -> s)
+  -> (b -> c) 
+  -> AmbiguousParser (a, s, c)
+mkCommand commandWithParam showable fun = do
+  cwp <- commandWithParam
+  pure (fst cwp, showable $ snd cwp, fun $ snd cwp)
 
-mkCommands :: [Command] -> Commands
-mkCommands = HashMap.fromList 
-  . mconcat 
-  . map 
-    (\x -> map 
-      (\y -> (y, x)) 
-      (commandPrefixes x)
-    )
+-- TODO: this will probably have existing implementation
+-- in the standard library. 
+-- TODO2: use haystack.
+urlRedirect :: Text -> [(Text, Text)] -> Action
+urlRedirect template replacements = UrlRedirect $ foldl'
+  (\template' (haystack, replacement) -> replace
+    haystack
+    (urlEncodeText replacement)
+    template'
+  )
+  template
+  replacements
+

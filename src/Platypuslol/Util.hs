@@ -1,5 +1,6 @@
 module Platypuslol.Util
   ( urlEncodeQuery
+  , urlEncodeText
   ) where
 
 import Network.HTTP.Types (urlEncode)

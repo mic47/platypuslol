@@ -1,0 +1,10 @@
+1.) [done] Add ability to load custom searches from file
+2.) Add ability to use opensearch https://en.wikibooks.org/wiki/Haskell/XML, https://developer.mozilla.org/en-US/docs/Web/OpenSearch, https://www.chromium.org/tab-to-search, https://developer.mozilla.org/en-US/docs/Mozilla/Creating_MozSearch_plugins
+3.) Add ability to pass through completion.
+4.) Add autoreaload.
+5.) Add ability to pass stuff like your email address (for multiple google accounts, and so on).
+6.) Add passthrough to other instances of this. 
+7.) Add authentication, so that you could possibly have confidential redirects (i.e. for use in company).
+8.) [done] Add proper parsers, so that you can have multiple word commands, and can use arbitrary prefixes of sommands (i,e, you could have search scala, but also any unique prefix, like s sc, or maybe even like ss).
+9.) Add connection to amazon alexa, or google voice assistant, and others?
+10.) Add ability to do completion (extend AmbiguousParser)

@@ -1,53 +1,71 @@
-module Platypuslol.RedirectServer 
+module Platypuslol.RedirectServer
   ( redirectServer
   ) where
 
+import Blaze.ByteString.Builder.Char.Utf8
+import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as A
+import Text.Blaze.Html.Renderer.Text
 import Network.Wai
-import Network.HTTP.Types (status400, status404)
-import Data.Maybe
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Data.Text.Encoding (decodeUtf8)
-import qualified Data.HashMap.Strict as HashMap
+import Data.Monoid
+import Network.HTTP.Types (status400, status404, status302, status200)
+import Data.Text (Text, unpack, pack)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Lazy (toStrict)
+import Text.Blaze
 
+import Platypuslol.AmbiguousParser
 import Platypuslol.Types
 
-redirectServer 
-  :: Command
-  -> Commands
-  -> Request 
-  -> (Response -> IO ResponseReceived) 
+redirectServer
+  :: (Text -> Action)
+  -> Command
+  -> Request
+  -> (Response -> IO ResponseReceived)
   -> IO ResponseReceived
-redirectServer defaultCommand commands req respond = respond $
+redirectServer defaultRedirect commands req respond = respond $
   case pathInfo req of
-    ["redirect"] -> redirectCommand 
-      defaultCommand
+    ["redirect"] -> redirectCommand
+      defaultRedirect
       commands
       (map toText $ queryString req)
     _ -> notFound
   where
     toText (x, y) = (decodeUtf8 x, decodeUtf8 <$> y)
 
-redirectCommand 
-  :: Command
-  -> Commands 
-  -> [(Text, Maybe Text)] 
+redirectCommand
+  :: (Text -> Action)
+  -> Command
+  -> [(Text, Maybe Text)]
   -> Response
-redirectCommand defaultCommand commands [("q", Just query)] = case tokenized of
-  (x:_) -> fromMaybe  
-    runDefaultCommand
-    ( (commandAction <$> HashMap.lookup x commands)
-      <*> return tokenized
-    )
-  _ -> runDefaultCommand
-  where
-    runDefaultCommand = commandAction defaultCommand ("":tokenized)
-    tokenized = Text.splitOn " " query
+redirectCommand defaultResponse commands [("q", Just query)] =
+  case parseAll commands (unpack query) of
+    [] -> actionToResponse $ defaultResponse query
+    [(_, _, x)] -> actionToResponse x
+    responses -> selectActionResponse responses
 redirectCommand _ _ _ = wrongQuery
+
+selectActionResponse :: [(String, Text, Action)] -> Response
+selectActionResponse actions = responseBuilder
+  status200
+  [("Content-Type", "text/html")]
+  $ fromText $ toStrict $ renderHtml $ H.docTypeHtml $ do
+    H.head $ H.title "Multiple matches"
+    H.body $ do
+      H.p "Too many matches. Please select the right query."
+      H.ul $ mapM_ (H.li . toLink) actions
+  where
+    toLink (name, params, UrlRedirect destination) =
+      H.a
+        (H.toHtml $
+          "Redirect action \"" <> pack name <> "\" with query \"" <> params <> "\""
+        )
+        ! A.href (textValue destination)
+
 
 wrongQuery :: Response
 wrongQuery = responseBuilder
-  status400 
+  status400
   [ ("Content-Type", "text/plain")
   ]
   "Query does not make sense."
@@ -58,3 +76,13 @@ notFound = responseBuilder
   [ ("Content-Type", "text/plain")
   ]
   "Page not found."
+
+actionToResponse :: Action -> Response
+actionToResponse (UrlRedirect destination) = responseBuilder
+  status302
+  [ ("Location"
+    , encodeUtf8 destination
+    )
+  ]
+  mempty
+
