@@ -6,6 +6,7 @@ module Platypuslol.Types
   , Action(..)
   ) where
 
+import Data.List
 import Data.Text (Text, replace, pack)
 
 import Platypuslol.AmbiguousParser
@@ -34,7 +35,7 @@ mkCommand commandWithParam showable fun = do
 -- in the standard library. 
 -- TODO2: use haystack.
 urlRedirect :: Text -> [(Text, Text)] -> Action
-urlRedirect template replacements = UrlRedirect $ foldl
+urlRedirect template replacements = UrlRedirect $ foldl'
   (\template' (haystack, replacement) -> replace
     haystack
     (urlEncodeText replacement)

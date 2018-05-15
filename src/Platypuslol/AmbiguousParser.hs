@@ -85,7 +85,6 @@ word = AmbiguousParser $ \x ->
   , drop 1 $ dropWhile (/= ' ') x
   )]
 
-
 anyString :: AmbiguousParser String
 anyString = AmbiguousParser splits
 
