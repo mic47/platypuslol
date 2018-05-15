@@ -1,5 +1,5 @@
 1.) [done] Add ability to load custom searches from file
-2.) Add ability to use opensearch https://en.wikibooks.org/wiki/Haskell/XML, https://developer.mozilla.org/en-US/docs/Web/OpenSearch, https://www.chromium.org/tab-to-search, https://developer.mozilla.org/en-US/docs/Mozilla/Creating_MozSearch_plugins
+2.) Add ability to use opensearch https://en.wikibooks.org/wiki/Haskell/XML, https://developer.mozilla.org/en-US/docs/Web/OpenSearch, https://www.chromium.org/tab-to-search, https://developer.mozilla.org/en-US/docs/Mozilla/Creating_MozSearch_plugins "window.external.AddSearchProvider("http://localhost:1234/lol.xml")"
 3.) Add ability to pass through completion.
 4.) Add autoreaload.
 5.) Add ability to pass stuff like your email address (for multiple google accounts, and so on).
