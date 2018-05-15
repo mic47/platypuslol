@@ -1,6 +1,8 @@
 module Platypuslol.AmbiguousParser
   ( AmbiguousParser
   , parseAll
+  , suggestAll
+  , setSuggestion
   , char
   , string
   , prefix
@@ -19,22 +21,62 @@ module Platypuslol.AmbiguousParser
 
 import Control.Arrow
 import Data.List
+import Data.Either
+import Data.Maybe
 
-newtype AmbiguousParser a = AmbiguousParser { parse :: String -> [(a, String)]}
+newtype AmbiguousParser a = AmbiguousParser
+  { parse :: String -> [(Either a a, String)]
+  }
 
 parseAll :: (AmbiguousParser a) -> String -> [a]
-parseAll (AmbiguousParser p) = map fst . filter ((""==) . snd) . p
+parseAll (AmbiguousParser p) =
+  mapMaybe (rightToMaybe . fst)
+  . filter (("" ==) . snd)
+  . filter (isRight . fst)
+  . p
+  where
+    rightToMaybe (Right x) = Just x
+    rightToMaybe Left{} = Nothing
+
+suggestAll :: (AmbiguousParser a) -> String -> [a]
+suggestAll (AmbiguousParser p) =
+  mapMaybe (leftToMaybe . fst)
+  . filter (("" ==) . snd)
+  . filter (isLeft . fst)
+  . p
+  where
+    leftToMaybe (Left a) = Just a
+    leftToMaybe Right{} = Nothing
+
+setSuggestion :: a -> AmbiguousParser a -> AmbiguousParser a
+setSuggestion suggestion (AmbiguousParser p) = AmbiguousParser $ \case
+  "" -> [(Left suggestion, "")]
+  x ->
+    let
+      (lefts', rights') = partition (isLeft . fst) (p x)
+    in
+      map (first (const (Left suggestion))) (take 1 lefts') ++ rights'
 
 instance Functor AmbiguousParser where
-  fmap f (AmbiguousParser p) = AmbiguousParser $ map (\(a, x)-> (f a, x)) . p
+  fmap f (AmbiguousParser p) = AmbiguousParser $ map (\(a, x) -> (f' a, x)) . p
+    where
+      f' (Left a) = Left $ f a
+      f' (Right a) = Right $ f a
 
 instance Applicative AmbiguousParser where
-  pure x = AmbiguousParser $ \a -> [(x, a)]
+  pure x = AmbiguousParser $ \a -> [(Right x, a)]
   (AmbiguousParser pf) <*> (AmbiguousParser px) = AmbiguousParser $ \s ->
-    [ (f x, rest2)
+    [ (f' f x, rest2)
     | (f, rest1) <- pf s
     , (x, rest2) <- px rest1
     ]
+    where
+      f' (Right f) (Right x) = Right $ f x
+      -- If any is Left, then result is Left
+      f' (Left f) (Left x) = Left $ f x
+      f' (Left f) (Right x) = Left $ f x
+      f' (Right f) (Left x) = Left $ f x
+
 
 option :: AmbiguousParser a -> AmbiguousParser a -> AmbiguousParser a
 option p q = anyOf [p, q]
@@ -42,7 +84,8 @@ option p q = anyOf [p, q]
 char :: Char -> AmbiguousParser Char
 char c = AmbiguousParser
   (\case
-    x:xs | x == c -> [(x, xs)]
+    x:xs | x == c -> [(Right x, xs)]
+    [] -> [(Left c, [])]
     _ -> []
   )
 
@@ -60,33 +103,59 @@ anyOf parsers = AmbiguousParser $ \s -> mconcat
     parsers
   )
 
-many :: AmbiguousParser a -> AmbiguousParser [a]
-many parser = option
-  (pure [])
-  (many1 parser)
+anyOfSuggestionOnce :: [AmbiguousParser a] -> AmbiguousParser a
+anyOfSuggestionOnce parsers = AmbiguousParser $ \s ->
+  ( takeWhileAndOne
+    (\x -> isRight (fst x) && "" /= snd x)
+    ( mconcat $ takeWhile (not . null) $ map
+      (\p -> parse p s)
+      (parsers)
+    )
+  )
+  where
+    takeWhileAndOne p l =
+      let (trues, falses) = span p (take 100 l) in trues ++ take 1 falses
 
-many1 :: AmbiguousParser a -> AmbiguousParser [a]
-many1 parser = do
+repeatParser :: Int -> AmbiguousParser a -> AmbiguousParser a
+repeatParser n parser = do
   x <- parser
-  y <- option
-    (pure [])
-    (many1 parser)
-  pure (x:y)
+  _ <- repeatParser' (n-1)
+  pure x
+  where
+    repeatParser' n'
+      | n' <= 0 = pure ()
+      | otherwise = do
+        _ <- parser
+        _ <- repeatParser' (n' - 1)
+        pure ()
+
+many :: AmbiguousParser a -> AmbiguousParser (Maybe a)
+many parser = anyOfSuggestionOnce $ pure Nothing : map (fmap Just . (`repeatParser` parser)) [1,2..]
+
+many1 :: AmbiguousParser a -> AmbiguousParser a
+many1 parser = anyOfSuggestionOnce $ map (`repeatParser` parser) [1,2..]
 
 prefix :: String -> AmbiguousParser String
-prefix x = anyOf $ map (fmap (const x) . string) $ reverse $ drop 1 $ inits x
+prefix x = setSuggestion x $ anyOf $ map (fmap (const x) . string) $ reverse $ drop 1 $ inits x
 
-eatAll :: AmbiguousParser String
-eatAll = AmbiguousParser $ \x -> [(x, "")]
+eatAll :: String -> AmbiguousParser String
+eatAll suggestion = AmbiguousParser $ \case
+  "" -> [(Left suggestion, "")]
+  x -> [(Right x, "")]
 
-word :: AmbiguousParser String
-word = AmbiguousParser $ \x ->
-  [( takeWhile (/= ' ') x
-  , drop 1 $ dropWhile (/= ' ') x
-  )]
+word :: String -> AmbiguousParser String
+word suggestion = AmbiguousParser $ \case
+  "" -> [(Left suggestion, "")]
+  x ->
+    [( Right $ takeWhile (/= ' ') x
+    , drop 1 $ dropWhile (/= ' ') x
+    )]
 
-anyString :: AmbiguousParser String
-anyString = AmbiguousParser splits
+anyString :: String -> AmbiguousParser String
+anyString suggestion = AmbiguousParser $ \case
+  "" -> [(Left suggestion, "")]
+  x -> map (first Right) (splits x)
+  where
 
 splits :: [a] -> [([a], [a])]
 splits [] = []

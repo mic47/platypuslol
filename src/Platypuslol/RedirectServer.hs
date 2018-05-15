@@ -9,6 +9,7 @@ import Text.Blaze.Html.Renderer.Text
 import Network.Wai
 import Data.Monoid
 import Network.HTTP.Types (status400, status404, status302, status200)
+import Data.List
 import Data.Text (Text, unpack, pack)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy (toStrict)
@@ -17,21 +18,44 @@ import Text.Blaze
 import Platypuslol.AmbiguousParser
 import Platypuslol.Types
 
+import Debug.Trace
+
 redirectServer
   :: (Text -> Action)
   -> Command
   -> Request
   -> (Response -> IO ResponseReceived)
   -> IO ResponseReceived
-redirectServer defaultRedirect commands req respond = respond $
-  case pathInfo req of
-    ["redirect"] -> redirectCommand
-      defaultRedirect
-      commands
-      (map toText $ queryString req)
-    _ -> notFound
+redirectServer defaultRedirect commands req respond = do
+  -- putStrLn $ show req
+  respond $
+    case pathInfo req of
+      ["redirect"] -> redirectCommand
+        defaultRedirect
+        commands
+        (map toText $ queryString req)
+      -- TODO: do that for redirecti/suggest with different param
+      ["suggest"] -> suggestCommand
+        defaultRedirect
+        commands
+        (map toText $ queryString req)
+      _ -> notFound
   where
     toText (x, y) = (decodeUtf8 x, decodeUtf8 <$> y)
+
+suggestCommand
+  :: (Text -> Action)
+  -> Command
+  -> [(Text, Maybe Text)]
+  -> Response
+suggestCommand _ commands [("q", Just query)] = responseBuilder
+  status200
+  [("Content-Type", "application/x-suggestions+json")]
+  $ fromText $ traceShowId $
+    "[\"" <> query <> "\",["
+    <> mconcat (intersperse "," $ map (pack . show . (\(a, _, _) -> a)) $ take 20 $ suggestAll commands (unpack query))
+    <> "]]"
+suggestCommand _ _ _ = wrongQuery
 
 redirectCommand
   :: (Text -> Action)

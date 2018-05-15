@@ -37,15 +37,15 @@ queryParser (q:qs) = do
     OptionalWord w -> (, []) <$> anyOf [string w, pure ""]
     QueryWord w -> do
       _ <- char ' '
-      query <- word
+      query <- word "<WORD>"
       pure (query, [(pack w, pack query)])
     QueryString w -> do
       _ <- char ' '
       query <- case qs of
-        [] -> eatAll
-        _ -> anyString
+        [] -> eatAll "<QUERY>"
+        _ -> anyString "<QUERY>"
       pure (query, [(pack w, pack query)])
-  -- TODO: solve problem with whitespace between query and non-query 
+  -- TODO: solve problem with whitespace between query and non-query
   _ <- many $ char ' '
   parse' <- queryParser qs
   pure $
