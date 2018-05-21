@@ -1,6 +1,8 @@
 module Platypuslol.Commands
   ( commands
   , defaultCommand
+  , queryParser
+  , QueryLang(..)
   ) where
 
 import Data.List
@@ -36,20 +38,28 @@ queryParser (q:qs) = do
     PrefixWord w -> (, []) <$> prefix w
     OptionalWord w -> (, []) <$> anyOf [string w, pure ""]
     QueryWord w -> do
-      _ <- char ' '
       query <- word "<WORD>"
       pure (query, [(pack w, pack query)])
     QueryString w -> do
-      _ <- char ' '
       query <- case qs of
         [] -> eatAll "<QUERY>"
         _ -> anyString "<QUERY>"
       pure (query, [(pack w, pack query)])
-  -- TODO: solve problem with whitespace between query and non-query
-  _ <- many $ char ' '
+  _ <- spaceType
   parse' <- queryParser qs
   pure $
     (fst parse:fst parse', snd parse ++ snd parse')
+    where
+      spaceType = case (q, qs) of
+        -- There is always space before query.
+        (_, QueryString{}:_) -> space1
+        (_, QueryWord{}:_) -> space1
+        -- There is always space after query, if non-query follows.
+        (QueryWord{}, OptionalWord{}:_) -> space1
+        (QueryWord{}, PrefixWord{}:_) -> space1
+        (QueryString{}, OptionalWord{}:_) -> space1
+        (QueryString{}, PrefixWord{}:_) -> space1
+        _ -> space
 
 queryParser' :: [QueryLang] -> AmbiguousParser (String, [(Text, Text)])
 queryParser' = fmap (\(x, a) -> (mconcat $ intersperse " " x, a)) . queryParser

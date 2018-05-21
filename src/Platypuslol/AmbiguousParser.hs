@@ -15,6 +15,9 @@ module Platypuslol.AmbiguousParser
   , anyString
   , prefixSentence
   , prefixSentence'
+  , pickLongestMatch
+  , space
+  , space1
   , spaced
   , separated
   ) where
@@ -56,6 +59,31 @@ setSuggestion suggestion (AmbiguousParser p) = AmbiguousParser $ \case
       (lefts', rights') = partition (isLeft . fst) (p x)
     in
       map (first (const (Left suggestion))) (take 1 lefts') ++ rights'
+
+pickMin
+  :: ((Either a a, String) -> (Either a a, String) -> Ordering)
+  -> AmbiguousParser a
+  -> AmbiguousParser a
+pickMin cmp (AmbiguousParser p) = AmbiguousParser $ take 1 . sortBy cmp . p
+
+ateMore
+  :: (Either (Int, a) (Int, a), String)
+  -> (Either (Int, a) (Int, a), String)
+  -> Ordering
+ateMore (Right a, _) (Right b, _) = compare (fst b) (fst a)
+ateMore (Right{}, _) _ = LT
+ateMore (Left a, _) (Left b, _) = compare (fst b) (fst a)
+ateMore _ _ = GT
+
+pickLongestMatch :: AmbiguousParser [a] -> AmbiguousParser [a]
+pickLongestMatch parser =
+  fmap snd
+  $ pickMin ateMore
+  $ fmap (\x -> (length x, x)) parser
+
+space, space1 :: AmbiguousParser String
+space = pickLongestMatch $ many $ char ' '
+space1 = pickLongestMatch $ many1 $ char ' '
 
 instance Functor AmbiguousParser where
   fmap f (AmbiguousParser p) = AmbiguousParser $ map (\(a, x) -> (f' a, x)) . p
@@ -116,23 +144,23 @@ anyOfSuggestionOnce parsers = AmbiguousParser $ \s ->
     takeWhileAndOne p l =
       let (trues, falses) = span p (take 100 l) in trues ++ take 1 falses
 
-repeatParser :: Int -> AmbiguousParser a -> AmbiguousParser a
+repeatParser :: Int -> AmbiguousParser a -> AmbiguousParser [a]
 repeatParser n parser = do
   x <- parser
-  _ <- repeatParser' (n-1)
-  pure x
+  xs <- repeatParser' (n-1)
+  pure (x: xs)
   where
     repeatParser' n'
-      | n' <= 0 = pure ()
+      | n' <= 0 = pure []
       | otherwise = do
-        _ <- parser
-        _ <- repeatParser' (n' - 1)
-        pure ()
+        x <- parser
+        xs <- repeatParser' (n' - 1)
+        pure (x:xs)
 
-many :: AmbiguousParser a -> AmbiguousParser (Maybe a)
-many parser = anyOfSuggestionOnce $ pure Nothing : map (fmap Just . (`repeatParser` parser)) [1,2..]
+many :: AmbiguousParser a -> AmbiguousParser [a]
+many parser = anyOfSuggestionOnce $ pure [] : map (`repeatParser` parser) [1,2..]
 
-many1 :: AmbiguousParser a -> AmbiguousParser a
+many1 :: AmbiguousParser a -> AmbiguousParser [a]
 many1 parser = anyOfSuggestionOnce $ map (`repeatParser` parser) [1,2..]
 
 prefix :: String -> AmbiguousParser String
@@ -166,7 +194,7 @@ prefixSentence [] = pure []
 prefixSentence (x:[]) = fmap (\y -> [y]) $ prefix x
 prefixSentence (x:xs) = do
   x' <- prefix x
-  w <- many $ string " "
+  w <- space
   xs' <- prefixSentence xs
   pure $ const (x':xs') w
 
@@ -176,7 +204,7 @@ prefixSentence' = fmap (mconcat . intersperse " ") . prefixSentence . words
 spaced :: AmbiguousParser a -> AmbiguousParser b -> AmbiguousParser (a, b)
 spaced p1 p2 = do
   p1' <- p1
-  w <- many1 $ char ' '
+  w <- space1
   p2' <- p2
   pure $ const (p1', p2') w
 
