@@ -96,10 +96,12 @@ executables:
     dependencies:
     - platypuslol
     - warp
+    - warp-tls
     - wai
     - text
     - http-types
     - blaze-builder
+    - optparse-applicative
     - utf8-string
     - unordered-containers
 
