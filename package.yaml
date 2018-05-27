@@ -17,6 +17,7 @@ data-files:
 - resources/favicon-16x16.png
 - resources/favicon-32x32.png
 - resources/favicon-96x96.png
+- resources/commands.conf
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -90,6 +91,7 @@ library:
   - unordered-containers
   - utf8-string
   - wai
+  - wai-extra
   - warp
 
 

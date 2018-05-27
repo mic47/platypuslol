@@ -11,6 +11,7 @@ import Network.Wai.Handler.WarpTLS
 import Options.Applicative
 
 import qualified Platypuslol.Commands as PC
+import Paths_platypuslol
 import Platypuslol.RedirectServer
 
 data Options = Options
@@ -58,8 +59,11 @@ parseOptions = execParser
 main :: IO ()
 main = do
   Options{..} <- parseOptions
-  config <- (read <$> readFile localConfigFile)
+  localConfig <- (read <$> readFile localConfigFile)
     `catch` \(_ :: SomeException) -> (return [])
+  globalConfigFile <- getDataFileName "resources/commands.conf"
+  globalConfig <- (read <$> readFile globalConfigFile)
+  let config = localConfig ++ globalConfig
   putStrLn $ "Listening on port " ++ show port
   let defServer = "localhost" <> pack (show port)
   if useTls
