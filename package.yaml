@@ -87,6 +87,7 @@ library:
   - blaze-markup
   - http-types
   - parsec
+  - stm
   - text
   - unordered-containers
   - utf8-string

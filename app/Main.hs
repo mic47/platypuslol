@@ -11,8 +11,9 @@ import Network.Wai.Handler.WarpTLS
 import Options.Applicative
 
 import qualified Platypuslol.Commands as PC
-import Paths_platypuslol
+import Platypuslol.CommandStore
 import Platypuslol.RedirectServer
+import Paths_platypuslol
 
 data Options = Options
   { localConfigFile :: FilePath
@@ -63,7 +64,9 @@ main = do
     `catch` \(_ :: SomeException) -> (return [])
   globalConfigFile <- getDataFileName "resources/commands.conf"
   globalConfig <- (read <$> readFile globalConfigFile)
-  let config = localConfig ++ globalConfig
+  let
+    commandParser = PC.commands $ localConfig ++ globalConfig
+  commandStore <- newCommandStore commandParser
   putStrLn $ "Listening on port " ++ show port
   let defServer = "localhost:" <> pack (show port)
   if useTls
@@ -76,12 +79,12 @@ main = do
       (redirectServer
         PC.defaultCommand
         ("https://", defServer)
-        (PC.commands config)
+        commandStore
       )
     else run
       port
       (redirectServer
         PC.defaultCommand
         ("http://", defServer)
-        (PC.commands config)
+        commandStore
       )

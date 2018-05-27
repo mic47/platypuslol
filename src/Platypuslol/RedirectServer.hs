@@ -3,6 +3,7 @@ module Platypuslol.RedirectServer
   ) where
 
 import Blaze.ByteString.Builder.Char.Utf8
+import Control.Monad.STM
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Text.Blaze.Html.Renderer.Text
@@ -22,6 +23,7 @@ import Data.Text.Lazy (toStrict)
 import Text.Blaze
 
 import Platypuslol.AmbiguousParser
+import Platypuslol.CommandStore
 import Platypuslol.Types
 import Platypuslol.Util
 
@@ -32,14 +34,15 @@ import Debug.Trace
 redirectServer
   :: (Text -> Action)
   -> (Text, Text)
-  -> Command
+  -> CommandStore
   -> Request
   -> (Response -> IO ResponseReceived)
   -> IO ResponseReceived
 -- TODO: this is getting out of hand. There should be reader monad so that
 -- request have access to all necessary data. 
-redirectServer defaultRedirect (urlPrefix, defServer) commands req respond = do
+redirectServer defaultRedirect (urlPrefix, defServer) commandStore req respond = do
     putStrLn $ show req
+    commands <- atomically $ getCommandParser commandStore
     (params', _files) <- parseRequestBodyEx
       (setMaxRequestFileSize (1024*1024) defaultParseRequestBodyOptions)
       lbsBackEnd 
