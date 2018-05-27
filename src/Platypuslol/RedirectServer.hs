@@ -3,6 +3,8 @@ module Platypuslol.RedirectServer
   ) where
 
 import Blaze.ByteString.Builder.Char.Utf8
+import Control.Exception
+import Control.Monad
 import Control.Monad.STM
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
@@ -21,6 +23,8 @@ import qualified Data.Text.IO as Text
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy (toStrict)
 import Text.Blaze
+import TextShow (showt)
+import System.FilePath.Posix
 
 import Platypuslol.AmbiguousParser
 import Platypuslol.CommandStore
@@ -31,21 +35,24 @@ import Paths_platypuslol
 
 import Debug.Trace
 
+type PostParams = HashMap.HashMap Text Text
+
 redirectServer
   :: (Text -> Action)
   -> (Text, Text)
   -> CommandStore
+  -> FilePath
   -> Request
   -> (Response -> IO ResponseReceived)
   -> IO ResponseReceived
 -- TODO: this is getting out of hand. There should be reader monad so that
--- request have access to all necessary data. 
-redirectServer defaultRedirect (urlPrefix, defServer) commandStore req respond = do
-    putStrLn $ show req
+-- request have access to all necessary data.
+redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req respond = do
+    -- putStrLn $ show req
     commands <- atomically $ getCommandParser commandStore
     (params', _files) <- parseRequestBodyEx
       (setMaxRequestFileSize (1024*1024) defaultParseRequestBodyOptions)
-      lbsBackEnd 
+      lbsBackEnd
       req
     let params = HashMap.fromList $ map (\(x, y) -> (decodeUtf8 x, decodeUtf8 y)) params'
     putStrLn $ show params
@@ -59,13 +66,13 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore req respond =
         defaultRedirect
         commands
         (map toText $ queryString req)
-      ["list"] -> return $ listCommands commands params
+      ["list"] -> listCommands commands params configDir
       [icon] | Set.member icon icons -> returnIcon icon
-      ("install": path) -> installResponse 
+      ("install": path) -> installResponse
         (mconcat
-          [ urlPrefix 
-          , fromMaybe defServer $ decodeUtf8 <$> HashMap.lookup 
-            "Host" 
+          [ urlPrefix
+          , fromMaybe defServer $ decodeUtf8 <$> HashMap.lookup
+            "Host"
             (HashMap.fromList (requestHeaders req))
           ]
         )
@@ -84,7 +91,7 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore req respond =
   where
     toText (x, y) = (decodeUtf8 x, decodeUtf8 <$> y)
     toQueryString path params = Text.dropWhile ('/'==) (path <> params)
-    icons = Set.fromList 
+    icons = Set.fromList
       [ "favicon-16x16.png"
       , "favicon-32x32.png"
       , "favicon-96x96.png"
@@ -117,42 +124,89 @@ redirectCommand defaultResponse commands [("q", Just query)] =
     responses -> selectActionResponse responses
 redirectCommand _ _ _ = wrongQuery
 
-listCommands :: Command -> HashMap.HashMap Text Text -> Response
-listCommands commands params = responseBuilder
-  status200
-  [("Content-Type", "text/html")]
-  $ fromText $ toStrict $ renderHtml $ H.docTypeHtml $ do
-    H.head $ H.title "List of available commands"
-    H.body $ do
-     H.p "List of available commands:"
-     H.ul $ mapM_
-       (H.li . toLink)
-       (sort $ map (\(a, _, _) -> a) $ suggestAll commands "")
-     H.p "Missing something? Add it!"
-     H.form 
-       ! A.method "post"
-       $ do 
-         H.p "search string:"
-         H.input
-           ! A.type_ "text"
-           ! A.name "query_string"
-           ! A.value (H.textValue $ HashMap.lookupDefault "" "query_string" params)
-         H.br
-         H.p "redirect string:"
-         H.input
-           ! A.type_ "text"
-           ! A.name "redirect_string"
-           ! A.value (H.textValue $ HashMap.lookupDefault "" "redirect_string" params)
-         H.br
-         H.input
-           ! A.type_ "submit"
-           ! A.name "submit"
-           ! A.value "Submit"
+listCommands :: Command -> PostParams -> FilePath -> IO Response
+listCommands commands params configDir = do
+  (message, params') <- updateConfig params configDir
+  return $ responseBuilder
+    status200
+    [("Content-Type", "text/html")]
+    $ fromText $ toStrict $ renderHtml $ H.docTypeHtml $ do
+      H.head $ H.title "List of available commands"
+      H.body $ do
+        listOfCommands commands
+        addCommandForm params' message
 
+updateConfig :: PostParams -> FilePath -> IO (Maybe Text, PostParams)
+updateConfig params configDir = case HashMap.lookup "submit" params of
+  Nothing -> return (Nothing, params)
+  Just{} -> case requestData of
+    Nothing -> return
+      ( Just "You have to submit all parameters"
+      , params
+      )
+    Just redirect ->
+      (do
+        -- TODO: this should be done at least with file locks,
+        -- or in other atomic way.
+        db <- (read <$> readFile config)
+          `catch` \(_ :: SomeException) -> return []
+        writeFile config $ show $ redirect : db
+        return
+          ( Just $ "New command successfully added!"
+          , HashMap.empty)
+      ) `catch` \(e :: SomeException) -> do
+        putStrLn $ show e
+        return
+          ( Just $ "Error while adding command:" <> showt e
+          , params
+          )
+
+  where
+    config = configDir </> "db.conf"
+    requestData = do
+      query <- HashMap.lookup "query_string" params
+      redirect <- HashMap.lookup "redirect_string" params
+      guard (query /= "")
+      guard (redirect /= "")
+      return (query, redirect)
+
+listOfCommands :: Command -> H.Markup
+listOfCommands commands = do
+  H.p "List of available commands:"
+  H.ul $ mapM_
+    (H.li . toLink)
+    (sort $ map (\(a, _, _) -> a) $ suggestAll commands "")
   where
     toLink query = H.a
       (H.toHtml query)
       ! A.href (textValue $ "redirect?q=" <> urlEncodeText (pack query))
+
+addCommandForm :: PostParams -> Maybe Text -> H.Markup
+addCommandForm params message = do
+  H.p "Missing something? Add it!"
+  H.form
+    ! A.method "post"
+    $ do
+      H.p "search string:"
+      H.input
+        ! A.type_ "text"
+        ! A.name "query_string"
+        ! A.value (H.textValue $ HashMap.lookupDefault "" "query_string" params)
+      H.br
+      H.p "redirect string:"
+      H.input
+        ! A.type_ "text"
+        ! A.name "redirect_string"
+        ! A.value (H.textValue $ HashMap.lookupDefault "" "redirect_string" params)
+      H.br
+      H.input
+        ! A.type_ "submit"
+        ! A.name "submit"
+        ! A.value "Submit"
+      case message of
+        Just p -> H.p
+          (H.text p)
+        Nothing -> return ()
 
 selectActionResponse :: [(String, Text, Action)] -> Response
 selectActionResponse actions = responseBuilder
@@ -192,13 +246,13 @@ installResponse _ _ = return notFound
 returnIcon :: Text -> IO Response
 returnIcon icon = do
   fileName <- getDataFileName ("resources/" <> unpack icon)
-  return $ responseFile 
+  return $ responseFile
     status200
     [ ("Content-Type", "image/png")
     ]
     fileName
     Nothing
-  
+
 
 wrongQuery :: Response
 wrongQuery = responseBuilder

@@ -11,6 +11,7 @@ import Data.Text (pack)
 import Network.Wai.Handler.Warp
 import Network.Wai.Handler.WarpTLS
 import Options.Applicative
+import System.Directory
 import System.FilePath.Posix
 import System.FSNotify
 
@@ -21,7 +22,7 @@ import Platypuslol.Types
 import Paths_platypuslol
 
 data Options = Options
-  { localConfigFile :: FilePath
+  { localConfigDir :: FilePath
   , port :: Int
   , useTls :: Bool
   , tlsCertFile :: String
@@ -64,15 +65,18 @@ parseOptions = execParser
 
 loadCommandParser :: Options -> IO Command
 loadCommandParser Options{..} = do
-  localConfig <- (read <$> readFile (localConfigFile </> "commands.conf"))
+  localConfig <- (read <$> readFile (localConfigDir </> "commands.conf"))
+    `catch` \(_ :: SomeException) -> (return [])
+  localDB <- (read <$> readFile (localConfigDir </> "db.conf"))
     `catch` \(_ :: SomeException) -> (return [])
   globalConfigFile <- getDataFileName "resources/commands.conf"
   globalConfig <- (read <$> readFile globalConfigFile)
-  return $ PC.commands $ localConfig ++ globalConfig
+  return $ PC.commands $ localConfig ++ globalConfig ++ localDB
 
 main :: IO ()
 main = do
   opts@Options{..} <- parseOptions
+  createDirectoryIfMissing True localConfigDir
   commandParser <- loadCommandParser opts
   commandStore <- newCommandStore commandParser
   putStrLn $ "Listening on port " ++ show port
@@ -80,7 +84,7 @@ main = do
   withManager $ \fsNotify -> do
     void $ watchDir
       fsNotify
-      localConfigFile
+      localConfigDir
       (const True)
       $ const $ do
         cmd <- loadCommandParser opts
@@ -98,6 +102,7 @@ main = do
         PC.defaultCommand
         ("https://", defServer)
         commandStore
+        localConfigDir
       )
     else run
       port
@@ -105,4 +110,5 @@ main = do
         PC.defaultCommand
         ("http://", defServer)
         commandStore
+        localConfigDir
       )

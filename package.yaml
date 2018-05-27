@@ -85,10 +85,12 @@ library:
   - blaze-builder
   - blaze-html
   - blaze-markup
+  - filepath
   - http-types
   - parsec
   - stm
   - text
+  - text-show
   - unordered-containers
   - utf8-string
   - wai
@@ -106,6 +108,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - platypuslol
+    - directory
     - filepath
     - fsnotify
     - warp
