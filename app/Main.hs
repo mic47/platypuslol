@@ -65,7 +65,7 @@ main = do
   globalConfig <- (read <$> readFile globalConfigFile)
   let config = localConfig ++ globalConfig
   putStrLn $ "Listening on port " ++ show port
-  let defServer = "localhost" <> pack (show port)
+  let defServer = "localhost:" <> pack (show port)
   if useTls
     then runTLS
       ( tlsSettings
@@ -73,15 +73,15 @@ main = do
         tlsKeyFile
       )
       (setPort port defaultSettings)
-      (redirectServer 
-        PC.defaultCommand 
-        ("https://" <> defServer) 
+      (redirectServer
+        PC.defaultCommand
+        ("https://", defServer)
         (PC.commands config)
       )
     else run
       port
-      (redirectServer 
-        PC.defaultCommand 
-        ("http://" <> defServer) 
+      (redirectServer
+        PC.defaultCommand
+        ("http://", defServer)
         (PC.commands config)
       )

@@ -7,9 +7,11 @@ import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Text.Blaze.Html.Renderer.Text
 import Network.Wai
+import Network.Wai.Parse
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as Set
 import Data.Monoid
+import Data.Maybe
 import Network.HTTP.Types (status400, status404, status302, status200)
 import Data.List
 import Data.Text (Text, unpack, pack)
@@ -29,13 +31,21 @@ import Debug.Trace
 
 redirectServer
   :: (Text -> Action)
-  -> Text
+  -> (Text, Text)
   -> Command
   -> Request
   -> (Response -> IO ResponseReceived)
   -> IO ResponseReceived
-redirectServer defaultRedirect urlPrefix commands req respond = do
-    -- putStrLn $ show req
+-- TODO: this is getting out of hand. There should be reader monad so that
+-- request have access to all necessary data. 
+redirectServer defaultRedirect (urlPrefix, defServer) commands req respond = do
+    putStrLn $ show req
+    (params', _files) <- parseRequestBodyEx
+      (setMaxRequestFileSize (1024*1024) defaultParseRequestBodyOptions)
+      lbsBackEnd 
+      req
+    let params = HashMap.fromList $ map (\(x, y) -> (decodeUtf8 x, decodeUtf8 y)) params'
+    putStrLn $ show params
     response <- case pathInfo req of
       ["redirect"] -> return $ redirectCommand
         defaultRedirect
@@ -46,13 +56,12 @@ redirectServer defaultRedirect urlPrefix commands req respond = do
         defaultRedirect
         commands
         (map toText $ queryString req)
-      ["list"] -> return $ listCommands commands
+      ["list"] -> return $ listCommands commands params
       [icon] | Set.member icon icons -> returnIcon icon
       ("install": path) -> installResponse 
         (mconcat
           [ urlPrefix 
-          , decodeUtf8 $ HashMap.lookupDefault 
-            "localhost:3000"
+          , fromMaybe defServer $ decodeUtf8 <$> HashMap.lookup 
             "Host" 
             (HashMap.fromList (requestHeaders req))
           ]
@@ -105,8 +114,8 @@ redirectCommand defaultResponse commands [("q", Just query)] =
     responses -> selectActionResponse responses
 redirectCommand _ _ _ = wrongQuery
 
-listCommands :: Command -> Response
-listCommands commands = responseBuilder
+listCommands :: Command -> HashMap.HashMap Text Text -> Response
+listCommands commands params = responseBuilder
   status200
   [("Content-Type", "text/html")]
   $ fromText $ toStrict $ renderHtml $ H.docTypeHtml $ do
@@ -116,6 +125,27 @@ listCommands commands = responseBuilder
      H.ul $ mapM_
        (H.li . toLink)
        (sort $ map (\(a, _, _) -> a) $ suggestAll commands "")
+     H.p "Missing something? Add it!"
+     H.form 
+       ! A.method "post"
+       $ do 
+         H.p "search string:"
+         H.input
+           ! A.type_ "text"
+           ! A.name "query_string"
+           ! A.value (H.textValue $ HashMap.lookupDefault "" "query_string" params)
+         H.br
+         H.p "redirect string:"
+         H.input
+           ! A.type_ "text"
+           ! A.name "redirect_string"
+           ! A.value (H.textValue $ HashMap.lookupDefault "" "redirect_string" params)
+         H.br
+         H.input
+           ! A.type_ "submit"
+           ! A.name "submit"
+           ! A.value "Submit"
+
   where
     toLink query = H.a
       (H.toHtml query)
