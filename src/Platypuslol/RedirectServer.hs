@@ -94,7 +94,7 @@ listCommands commands = responseBuilder
   where
     toLink query = H.a
       (H.toHtml query)
-      ! A.href (textValue $ "http://localhost:3000/redirect?q=" <> urlEncodeText (pack query))
+      ! A.href (textValue $ "redirect?q=" <> urlEncodeText (pack query))
 
 selectActionResponse :: [(String, Text, Action)] -> Response
 selectActionResponse actions = responseBuilder
