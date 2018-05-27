@@ -87,4 +87,7 @@ commands fromConfig = anyOf $ map (uncurry simpleRedirect) $
   , ( "search scala types {query}"
     , "http://scala-search.org/?m=org.scala-lang%3Ascala-library%3A2.11.7&m=org.scalaz%3Ascalaz-core_2.11%3A7.1.1&q={query}"
     )
+  , ( "list"
+    , "http://localhost:3000/list"
+    )
   ] ++ fromConfig

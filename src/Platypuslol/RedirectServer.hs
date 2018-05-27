@@ -28,9 +28,7 @@ redirectServer
   -> Request
   -> (Response -> IO ResponseReceived)
   -> IO ResponseReceived
-redirectServer defaultRedirect commands req respond = do
-  -- putStrLn $ show req
-  respond $
+redirectServer defaultRedirect commands req respond = respond $
     case pathInfo req of
       ["redirect"] -> redirectCommand
         defaultRedirect
@@ -41,6 +39,7 @@ redirectServer defaultRedirect commands req respond = do
         defaultRedirect
         commands
         (map toText $ queryString req)
+      ["list"] -> listCommands commands
       _ -> redirectCommand
         defaultRedirect
         commands
@@ -80,6 +79,22 @@ redirectCommand defaultResponse commands [("q", Just query)] =
     [(_, _, x)] -> actionToResponse x
     responses -> selectActionResponse responses
 redirectCommand _ _ _ = wrongQuery
+
+listCommands :: Command -> Response
+listCommands commands = responseBuilder
+  status200
+  [("Content-Type", "text/html")]
+  $ fromText $ toStrict $ renderHtml $ H.docTypeHtml $ do
+    H.head $ H.title "List of available commands"
+    H.body $ do
+     H.p "List of available commands:"
+     H.ul $ mapM_
+       (H.li . toLink)
+       (sort $ map (\(a, _, _) -> a) $ suggestAll commands "")
+  where
+    toLink query = H.a
+      (H.toHtml query)
+      ! A.href (textValue $ "http://localhost:3000/redirect?q=" <> urlEncodeText (pack query))
 
 selectActionResponse :: [(String, Text, Action)] -> Response
 selectActionResponse actions = responseBuilder
