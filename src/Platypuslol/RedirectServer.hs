@@ -11,12 +11,14 @@ import Data.Monoid
 import Network.HTTP.Types (status400, status404, status302, status200)
 import Data.List
 import Data.Text (Text, unpack, pack)
+import qualified Data.Text as Text
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy (toStrict)
 import Text.Blaze
 
 import Platypuslol.AmbiguousParser
 import Platypuslol.Types
+import Platypuslol.Util
 
 import Debug.Trace
 
@@ -39,9 +41,19 @@ redirectServer defaultRedirect commands req respond = do
         defaultRedirect
         commands
         (map toText $ queryString req)
-      _ -> notFound
+      _ -> redirectCommand
+        defaultRedirect
+        commands
+        [ ( "q"
+          , (Just $ urlDecodeText $ toQueryString
+              (decodeUtf8 $ rawPathInfo req)
+              (decodeUtf8 $ rawQueryString req)
+            )
+          )
+        ]
   where
     toText (x, y) = (decodeUtf8 x, decodeUtf8 <$> y)
+    toQueryString path params = Text.dropWhile ('/'==) (path <> params)
 
 suggestCommand
   :: (Text -> Action)
