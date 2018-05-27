@@ -2,6 +2,7 @@ module Platypuslol.CommandStore
   ( CommandStore
   , getCommandParser
   , newCommandStore
+  , setCommandParser
   ) where
 
 import Control.Monad.STM
@@ -16,3 +17,6 @@ getCommandParser (CommandStore x) = readTVar x
 
 newCommandStore :: Command -> IO CommandStore
 newCommandStore = fmap CommandStore . newTVarIO
+
+setCommandParser :: CommandStore -> Command -> STM ()
+setCommandParser (CommandStore x) = writeTVar x

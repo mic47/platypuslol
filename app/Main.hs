@@ -4,15 +4,20 @@ module Main
   ) where
 
 import Control.Exception
+import Control.Monad
+import Control.Monad.STM
 import Data.Monoid
 import Data.Text (pack)
 import Network.Wai.Handler.Warp
 import Network.Wai.Handler.WarpTLS
 import Options.Applicative
+import System.FilePath.Posix
+import System.FSNotify
 
 import qualified Platypuslol.Commands as PC
 import Platypuslol.CommandStore
 import Platypuslol.RedirectServer
+import Platypuslol.Types
 import Paths_platypuslol
 
 data Options = Options
@@ -26,9 +31,9 @@ data Options = Options
 optionsParser :: Parser Options
 optionsParser = Options
   <$> strOption
-    ( long "config"
+    ( long "config-dir"
     <> metavar "FILE"
-    <> value "/home/mic/.platypus.conf"
+    <> value "/home/mic/.config/platypuslol"
     )
   <*> option auto
     ( long "port"
@@ -57,19 +62,32 @@ parseOptions = execParser
     )
   )
 
-main :: IO ()
-main = do
-  Options{..} <- parseOptions
-  localConfig <- (read <$> readFile localConfigFile)
+loadCommandParser :: Options -> IO Command
+loadCommandParser Options{..} = do
+  localConfig <- (read <$> readFile (localConfigFile </> "commands.conf"))
     `catch` \(_ :: SomeException) -> (return [])
   globalConfigFile <- getDataFileName "resources/commands.conf"
   globalConfig <- (read <$> readFile globalConfigFile)
-  let
-    commandParser = PC.commands $ localConfig ++ globalConfig
+  return $ PC.commands $ localConfig ++ globalConfig
+
+main :: IO ()
+main = do
+  opts@Options{..} <- parseOptions
+  commandParser <- loadCommandParser opts
   commandStore <- newCommandStore commandParser
   putStrLn $ "Listening on port " ++ show port
   let defServer = "localhost:" <> pack (show port)
-  if useTls
+  withManager $ \fsNotify -> do
+    void $ watchDir
+      fsNotify
+      localConfigFile
+      (const True)
+      $ const $ do
+        cmd <- loadCommandParser opts
+        atomically $ setCommandParser commandStore cmd
+        putStrLn "Reloaded parsers."
+
+    if useTls
     then runTLS
       ( tlsSettings
         tlsCertFile

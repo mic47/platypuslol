@@ -106,12 +106,15 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - platypuslol
+    - filepath
+    - fsnotify
     - warp
     - warp-tls
     - wai
     - text
     - http-types
     - blaze-builder
+    - stm
     - optparse-applicative
     - utf8-string
     - unordered-containers
