@@ -5,6 +5,7 @@ module Main
 
 import Control.Exception
 import Data.Monoid
+import Data.Text (pack)
 import Network.Wai.Handler.Warp
 import Network.Wai.Handler.WarpTLS
 import Options.Applicative
@@ -60,6 +61,7 @@ main = do
   config <- (read <$> readFile localConfigFile)
     `catch` \(_ :: SomeException) -> (return [])
   putStrLn $ "Listening on port " ++ show port
+  let defServer = "localhost" <> pack (show port)
   if useTls
     then runTLS
       ( tlsSettings
@@ -67,7 +69,15 @@ main = do
         tlsKeyFile
       )
       (setPort port defaultSettings)
-      (redirectServer PC.defaultCommand $ PC.commands config)
+      (redirectServer 
+        PC.defaultCommand 
+        ("https://" <> defServer) 
+        (PC.commands config)
+      )
     else run
       port
-      (redirectServer PC.defaultCommand $ PC.commands config)
+      (redirectServer 
+        PC.defaultCommand 
+        ("http://" <> defServer) 
+        (PC.commands config)
+      )

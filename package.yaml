@@ -10,6 +10,14 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
+data-files:
+- resources/index.html
+- resources/opensearch.xml
+- resources/favicon.ico
+- resources/favicon-16x16.png
+- resources/favicon-32x32.png
+- resources/favicon-96x96.png
+
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web

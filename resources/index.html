@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link 
+      rel="search" 
+      type="application/opensearchdescription+xml" 
+      title="Platypuslol" 
+      href="{server}/install/opensearch.xml" 
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  </head>
+  <body>
+    To install Platypuslol, just do following:
+    <ul>
+      <li>
+        If you are on Firefox browser, <a href="#" onclick="window.external.AddSearchProvider('{server}/install/opensearch.xml');">click here to add it</a>. I recommend to add it as your default search engine, so that you have search suggestions. Otherwise, go to settings for search engines, and assign keyword to it (for example "p") and that as prefox for your searches.
+      </li>
+      <li>
+        If you are on other browser, and none of the above works, try to install following <a href="{server}/install/opensearch.xml">opensearch plugin manually</a> in your browser, or create search plugin with following search url "{server}/redirect?q={searchTerms}" and following suggestion url "{server}/suggest?q={searchTerms}".
+      </li>
+    </ul>
+  </body>
+</html>

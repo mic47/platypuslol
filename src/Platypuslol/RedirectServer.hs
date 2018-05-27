@@ -7,11 +7,14 @@ import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import Text.Blaze.Html.Renderer.Text
 import Network.Wai
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as Set
 import Data.Monoid
 import Network.HTTP.Types (status400, status404, status302, status200)
 import Data.List
 import Data.Text (Text, unpack, pack)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy (toStrict)
 import Text.Blaze
@@ -20,27 +23,42 @@ import Platypuslol.AmbiguousParser
 import Platypuslol.Types
 import Platypuslol.Util
 
+import Paths_platypuslol
+
 import Debug.Trace
 
 redirectServer
   :: (Text -> Action)
+  -> Text
   -> Command
   -> Request
   -> (Response -> IO ResponseReceived)
   -> IO ResponseReceived
-redirectServer defaultRedirect commands req respond = respond $
-    case pathInfo req of
-      ["redirect"] -> redirectCommand
+redirectServer defaultRedirect urlPrefix commands req respond = do
+    -- putStrLn $ show req
+    response <- case pathInfo req of
+      ["redirect"] -> return $ redirectCommand
         defaultRedirect
         commands
         (map toText $ queryString req)
       -- TODO: do that for redirecti/suggest with different param
-      ["suggest"] -> suggestCommand
+      ["suggest"] -> return $ suggestCommand
         defaultRedirect
         commands
         (map toText $ queryString req)
-      ["list"] -> listCommands commands
-      _ -> redirectCommand
+      ["list"] -> return $ listCommands commands
+      [icon] | Set.member icon icons -> returnIcon icon
+      ("install": path) -> installResponse 
+        (mconcat
+          [ urlPrefix 
+          , decodeUtf8 $ HashMap.lookupDefault 
+            "localhost:3000"
+            "Host" 
+            (HashMap.fromList (requestHeaders req))
+          ]
+        )
+        path
+      _ -> return $ redirectCommand
         defaultRedirect
         commands
         [ ( "q"
@@ -50,9 +68,16 @@ redirectServer defaultRedirect commands req respond = respond $
             )
           )
         ]
+    respond response
   where
     toText (x, y) = (decodeUtf8 x, decodeUtf8 <$> y)
     toQueryString path params = Text.dropWhile ('/'==) (path <> params)
+    icons = Set.fromList 
+      [ "favicon-16x16.png"
+      , "favicon-32x32.png"
+      , "favicon-96x96.png"
+      , "favicon.ico"
+      ]
 
 suggestCommand
   :: (Text -> Action)
@@ -113,6 +138,34 @@ selectActionResponse actions = responseBuilder
         )
         ! A.href (textValue destination)
 
+installResponse :: Text -> [Text] -> IO Response
+installResponse serverName [] = do
+  installTemplateFile <- getDataFileName "resources/index.html"
+  installTemplate <- Text.readFile installTemplateFile
+  return $ responseBuilder
+    status200
+    [("Content-Type", "text/html")]
+    (fromText $ Text.replace "{server}" serverName installTemplate)
+installResponse serverName ["opensearch.xml"] = do
+  opensearchTemplateFile <- getDataFileName "resources/opensearch.xml"
+  opensearchTemplate <- Text.readFile opensearchTemplateFile
+  return $ responseBuilder
+    status200
+    [("Content-Type", "application/opensearchdescription+xml")]
+    (fromText $ Text.replace "{server}" serverName opensearchTemplate)
+installResponse _ _ = return notFound
+
+
+returnIcon :: Text -> IO Response
+returnIcon icon = do
+  fileName <- getDataFileName ("resources/" <> unpack icon)
+  return $ responseFile 
+    status200
+    [ ("Content-Type", "image/png")
+    ]
+    fileName
+    Nothing
+  
 
 wrongQuery :: Response
 wrongQuery = responseBuilder

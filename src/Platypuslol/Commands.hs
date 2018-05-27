@@ -90,4 +90,7 @@ commands fromConfig = anyOf $ map (uncurry simpleRedirect) $
   , ( "list"
     , "list"
     )
+  , ( "install"
+    , "install"
+    )
   ] ++ fromConfig

@@ -1,4 +1,6 @@
 .stack-work/
 platypuslol.cabal
+localhost.crt
+localhost.key
 *~
 *.sw[a-z]
