@@ -62,7 +62,6 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req
         allParams
       -- TODO: do that for redirecti/suggest with different param
       ["suggest"] -> return $ suggestCommand
-        defaultRedirect
         commands
         allParams
       ["list"] -> listCommands commands params configDir
@@ -94,11 +93,10 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req
       ]
 
 suggestCommand
-  :: (Text -> Action)
-  -> Command
+  :: Command
   -> [(Text, Maybe Text)]
   -> Response
-suggestCommand _ commands [("q", Just query)] = responseBuilder
+suggestCommand commands [("q", Just query)] = responseBuilder
   status200
   [("Content-Type", "application/x-suggestions+json")]
   $ fromText $
@@ -107,10 +105,14 @@ suggestCommand _ commands [("q", Just query)] = responseBuilder
       ( intersperse ","
       $ map (pack . show . (\(a, _, _) -> a))
       $ take 20
-      $ parseThenSuggest commands (unpack query)
+      $ tryAgain $ parseThenSuggest commands (unpack query)
       )
     <> "]]"
-suggestCommand _ _ _ = wrongQuery
+  where
+    -- Firefox prepends keyword. Let's drop it.
+    tryAgain [] = parseThenSuggest commands (dropWhile (==' ') $ dropWhile (/=' ') $ unpack query)
+    tryAgain x = x
+suggestCommand _ _ = wrongQuery
 
 redirectCommand
   :: (Text -> Action)
