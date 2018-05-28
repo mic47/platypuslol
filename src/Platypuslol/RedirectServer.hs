@@ -49,28 +49,32 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req
       (setMaxRequestFileSize (1024*1024) defaultParseRequestBodyOptions)
       lbsBackEnd
       req
-    let params = HashMap.fromList $ map (\(x, y) -> (decodeUtf8 x, decodeUtf8 y)) params'
-    putStrLn $ show params
+    let
+      params = HashMap.fromList $ map (\(x, y) -> (decodeUtf8 x, decodeUtf8 y)) params'
+      hostUrl = mconcat
+        [ urlPrefix
+        , fromMaybe defServer $ decodeUtf8 <$> HashMap.lookup
+          "Host"
+          (HashMap.fromList (requestHeaders req))
+        ]
+      allParams = map toText (queryString req ++ map (fmap Just) params')
     response <- case pathInfo req of
       ["redirect"] -> return $ redirectCommand
         defaultRedirect
         commands
-        (map toText $ queryString req)
+        allParams
       -- TODO: do that for redirecti/suggest with different param
       ["suggest"] -> return $ suggestCommand
         defaultRedirect
         commands
-        (map toText $ queryString req)
+        allParams
       ["list"] -> listCommands commands params configDir
       [icon] | Set.member icon icons -> returnIcon icon
+      [] -> installResponse
+        hostUrl
+        []
       ("install": path) -> installResponse
-        (mconcat
-          [ urlPrefix
-          , fromMaybe defServer $ decodeUtf8 <$> HashMap.lookup
-            "Host"
-            (HashMap.fromList (requestHeaders req))
-          ]
-        )
+        hostUrl
         path
       _ -> return $ redirectCommand
         defaultRedirect

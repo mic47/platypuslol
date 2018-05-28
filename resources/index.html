@@ -19,8 +19,17 @@
         If you are on Firefox browser, <a href="#" onclick="window.external.AddSearchProvider('{server}/install/opensearch.xml');">click here to add it</a>. I recommend to add it as your default search engine, so that you have search suggestions. Otherwise, go to settings for search engines, and assign keyword to it (for example "p") and that as prefox for your searches.
       </li>
       <li>
+        If you are using Google Chrome, do following.
+        <ol>
+          <li>Make sure you navigated to the domain url <a href="{server}">{server}</a> (not "{server}/install").</li>
+          <li><form method="GET" action="{server}/redirect"><input name="q" value="install" type="text" /><input type="submit" value="Perform this search"/></form></li>
+          <li>Platypus search engine should be added to your list of search engines. Go to settings and set it as default (or set proper keyword, like "p").</li>
+        </ol>
+      </li>
+      <li>
         If you are on other browser, and none of the above works, try to install following <a href="{server}/install/opensearch.xml">opensearch plugin manually</a> in your browser, or create search plugin with following search url "{server}/redirect?q={searchTerms}" and following suggestion url "{server}/suggest?q={searchTerms}".
       </li>
     </ul>
+    To see list of available commands, go <a href="{server}/list">here</a>.
   </body>
 </html>
