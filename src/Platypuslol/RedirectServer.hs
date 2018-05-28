@@ -12,7 +12,6 @@ import Network.Wai.Parse
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as Set
 import Data.Monoid
-import Data.Maybe
 import Network.HTTP.Types (status400, status404, status302, status200)
 import Data.List
 import Data.Text (Text, unpack, pack)
@@ -29,8 +28,6 @@ import Platypuslol.Util
 import Platypuslol.Web.List
 
 import Paths_platypuslol
-
-import Debug.Trace
 
 redirectServer
   :: (Text -> Action)
@@ -53,7 +50,7 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req
       params = HashMap.fromList $ map (\(x, y) -> (decodeUtf8 x, decodeUtf8 y)) params'
       hostUrl = mconcat
         [ urlPrefix
-        , fromMaybe defServer $ decodeUtf8 <$> HashMap.lookup
+        , maybe defServer decodeUtf8 $ HashMap.lookup
           "Host"
           (HashMap.fromList (requestHeaders req))
         ]
@@ -80,10 +77,9 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req
         defaultRedirect
         commands
         [ ( "q"
-          , (Just $ urlDecodeText $ toQueryString
+          , Just $ urlDecodeText $ toQueryString
               (decodeUtf8 $ rawPathInfo req)
               (decodeUtf8 $ rawQueryString req)
-            )
           )
         ]
     respond response
@@ -105,7 +101,7 @@ suggestCommand
 suggestCommand _ commands [("q", Just query)] = responseBuilder
   status200
   [("Content-Type", "application/x-suggestions+json")]
-  $ fromText $ traceShowId $
+  $ fromText $
     "[\"" <> query <> "\",["
     <> mconcat (intersperse "," $ map (pack . show . (\(a, _, _) -> a)) $ take 20 $ suggestAll commands (unpack query))
     <> "]]"

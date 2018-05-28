@@ -53,10 +53,10 @@ updateConfig params configDir = case HashMap.lookup "submit" params of
           `catch` \(_ :: SomeException) -> return []
         writeFile config $ show $ redirect : db
         return
-          ( Just $ "New command successfully added!"
+          ( Just "New command successfully added!"
           , HashMap.empty)
       ) `catch` \(e :: SomeException) -> do
-        putStrLn $ show e
+        print e
         return
           ( Just $ "Error while adding command:" <> showt e
           , params

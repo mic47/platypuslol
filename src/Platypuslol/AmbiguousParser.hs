@@ -31,7 +31,7 @@ newtype AmbiguousParser a = AmbiguousParser
   { parse :: String -> [(Either a a, String)]
   }
 
-parseAll :: (AmbiguousParser a) -> String -> [a]
+parseAll :: AmbiguousParser a -> String -> [a]
 parseAll (AmbiguousParser p) =
   mapMaybe (rightToMaybe . fst)
   . filter (("" ==) . snd)
@@ -41,7 +41,7 @@ parseAll (AmbiguousParser p) =
     rightToMaybe (Right x) = Just x
     rightToMaybe Left{} = Nothing
 
-suggestAll :: (AmbiguousParser a) -> String -> [a]
+suggestAll :: AmbiguousParser a -> String -> [a]
 suggestAll (AmbiguousParser p) =
   mapMaybe (leftToMaybe . fst)
   . filter (("" ==) . snd)
@@ -86,7 +86,7 @@ space = pickLongestMatch $ many $ char ' '
 space1 = pickLongestMatch $ many1 $ char ' '
 
 instance Functor AmbiguousParser where
-  fmap f (AmbiguousParser p) = AmbiguousParser $ map (\(a, x) -> (f' a, x)) . p
+  fmap f (AmbiguousParser p) = AmbiguousParser $ map (first f') . p
     where
       f' (Left a) = Left $ f a
       f' (Right a) = Right $ f a
@@ -127,7 +127,7 @@ string (x:xs) = do
 anyOf :: [AmbiguousParser a] -> AmbiguousParser a
 anyOf parsers = AmbiguousParser $ \s -> mconcat
   ( map
-    (\p -> parse p s)
+    (`parse` s)
     parsers
   )
 
@@ -136,8 +136,8 @@ anyOfSuggestionOnce parsers = AmbiguousParser $ \s ->
   ( takeWhileAndOne
     (\x -> isRight (fst x) && "" /= snd x)
     ( mconcat $ takeWhile (not . null) $ map
-      (\p -> parse p s)
-      (parsers)
+      (`parse` s)
+      parsers
     )
   )
   where
@@ -183,15 +183,14 @@ anyString :: String -> AmbiguousParser String
 anyString suggestion = AmbiguousParser $ \case
   "" -> [(Left suggestion, "")]
   x -> map (first Right) (splits x)
-  where
 
 splits :: [a] -> [([a], [a])]
 splits [] = []
-splits (a:as) = ([a], as) : (map (first (a:)) $ splits as)
+splits (a:as) = ([a], as) : map (first (a:)) (splits as)
 
 prefixSentence :: [String] -> AmbiguousParser [String]
 prefixSentence [] = pure []
-prefixSentence (x:[]) = fmap (\y -> [y]) $ prefix x
+prefixSentence [x] = (:[]) <$> prefix x
 prefixSentence (x:xs) = do
   x' <- prefix x
   w <- space
@@ -210,7 +209,7 @@ spaced p1 p2 = do
 
 separated :: AmbiguousParser a -> [AmbiguousParser b] -> AmbiguousParser [b]
 separated _ [] = pure []
-separated _ [x] = fmap (\a -> [a]) x
+separated _ [x] = fmap (:[]) x
 separated separator (x:xs) = do
   x' <- x
   s <- separator

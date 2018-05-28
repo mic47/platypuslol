@@ -47,7 +47,7 @@ queryParser (q:qs) = do
       pure (query, [(pack w, pack query)])
   _ <- spaceType
   parse' <- queryParser qs
-  pure $
+  pure 
     (fst parse:fst parse', snd parse ++ snd parse')
     where
       spaceType = case (q, qs) of
