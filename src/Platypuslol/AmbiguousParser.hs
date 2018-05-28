@@ -2,6 +2,7 @@ module Platypuslol.AmbiguousParser
   ( AmbiguousParser
   , parseAll
   , suggestAll
+  , parseThenSuggest
   , setSuggestion
   , char
   , string
@@ -40,6 +41,17 @@ parseAll (AmbiguousParser p) =
   where
     rightToMaybe (Right x) = Just x
     rightToMaybe Left{} = Nothing
+
+parseThenSuggest :: AmbiguousParser a -> String -> [a]
+parseThenSuggest (AmbiguousParser p) =
+  toList
+  . partitionEithers
+  . map fst
+  . filter ((""==) . snd)
+  . p
+  where
+    toList (l, r) = r ++ l
+
 
 suggestAll :: AmbiguousParser a -> String -> [a]
 suggestAll (AmbiguousParser p) =

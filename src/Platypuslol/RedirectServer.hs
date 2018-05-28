@@ -103,7 +103,12 @@ suggestCommand _ commands [("q", Just query)] = responseBuilder
   [("Content-Type", "application/x-suggestions+json")]
   $ fromText $
     "[\"" <> query <> "\",["
-    <> mconcat (intersperse "," $ map (pack . show . (\(a, _, _) -> a)) $ take 20 $ suggestAll commands (unpack query))
+    <> mconcat
+      ( intersperse ","
+      $ map (pack . show . (\(a, _, _) -> a))
+      $ take 20
+      $ parseThenSuggest commands (unpack query)
+      )
     <> "]]"
 suggestCommand _ _ _ = wrongQuery
 
