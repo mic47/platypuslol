@@ -28,24 +28,43 @@ import Data.List
 import Data.Either
 import Data.Maybe
 
+data ParserResult a
+  = Parsed a
+  | Suggested a
+  deriving (Show)
+
+isParsed :: ParserResult a -> Bool
+isParsed Parsed{} = True
+isParsed Suggested{} = False
+
+isSuggested :: ParserResult a -> Bool
+isSuggested Parsed{} = False
+isSuggested Suggested{} = True
+
+partitionParserResult :: [ParserResult a] -> ([a], [a])
+partitionParserResult = partitionEithers . map pToE
+  where
+    pToE (Parsed x) = Right x
+    pToE (Suggested x) = Left x
+
 newtype AmbiguousParser a = AmbiguousParser
-  { parse :: String -> [(Either a a, String)]
+  { parse :: String -> [(ParserResult a, String)]
   }
 
 parseAll :: AmbiguousParser a -> String -> [a]
 parseAll (AmbiguousParser p) =
   mapMaybe (rightToMaybe . fst)
   . filter (("" ==) . snd)
-  . filter (isRight . fst)
+  . filter (isParsed . fst)
   . p
   where
-    rightToMaybe (Right x) = Just x
-    rightToMaybe Left{} = Nothing
+    rightToMaybe (Parsed x) = Just x
+    rightToMaybe Suggested{} = Nothing
 
 parseThenSuggest :: AmbiguousParser a -> String -> [a]
 parseThenSuggest (AmbiguousParser p) =
   toList
-  . partitionEithers
+  . partitionParserResult
   . map fst
   . filter ((""==) . snd)
   . p
@@ -57,34 +76,34 @@ suggestAll :: AmbiguousParser a -> String -> [a]
 suggestAll (AmbiguousParser p) =
   mapMaybe (leftToMaybe . fst)
   . filter (("" ==) . snd)
-  . filter (isLeft . fst)
+  . filter (isSuggested . fst)
   . p
   where
-    leftToMaybe (Left a) = Just a
-    leftToMaybe Right{} = Nothing
+    leftToMaybe (Suggested a) = Just a
+    leftToMaybe Parsed{} = Nothing
 
 setSuggestion :: a -> AmbiguousParser a -> AmbiguousParser a
 setSuggestion suggestion (AmbiguousParser p) = AmbiguousParser $ \case
-  "" -> [(Left suggestion, "")]
+  "" -> [(Suggested suggestion, "")]
   x ->
     let
-      (lefts', rights') = partition (isLeft . fst) (p x)
+      (lefts', rights') = partition (isSuggested . fst) (p x)
     in
-      map (first (const (Left suggestion))) (take 1 lefts') ++ rights'
+      map (first (const (Suggested suggestion))) (take 1 lefts') ++ rights'
 
 pickMin
-  :: ((Either a a, String) -> (Either a a, String) -> Ordering)
+  :: ((ParserResult a, String) -> (ParserResult a, String) -> Ordering)
   -> AmbiguousParser a
   -> AmbiguousParser a
 pickMin cmp (AmbiguousParser p) = AmbiguousParser $ take 1 . sortBy cmp . p
 
 ateMore
-  :: (Either (Int, a) (Int, a), String)
-  -> (Either (Int, a) (Int, a), String)
+  :: (ParserResult (Int, a), String)
+  -> (ParserResult (Int, a), String)
   -> Ordering
-ateMore (Right a, _) (Right b, _) = compare (fst b) (fst a)
-ateMore (Right{}, _) _ = LT
-ateMore (Left a, _) (Left b, _) = compare (fst b) (fst a)
+ateMore (Parsed a, _) (Parsed b, _) = compare (fst b) (fst a)
+ateMore (Parsed{}, _) _ = LT
+ateMore (Suggested a, _) (Suggested b, _) = compare (fst b) (fst a)
 ateMore _ _ = GT
 
 pickLongestMatch :: AmbiguousParser [a] -> AmbiguousParser [a]
@@ -100,22 +119,22 @@ space1 = pickLongestMatch $ many1 $ char ' '
 instance Functor AmbiguousParser where
   fmap f (AmbiguousParser p) = AmbiguousParser $ map (first f') . p
     where
-      f' (Left a) = Left $ f a
-      f' (Right a) = Right $ f a
+      f' (Suggested a) = Suggested $ f a
+      f' (Parsed a) = Parsed $ f a
 
 instance Applicative AmbiguousParser where
-  pure x = AmbiguousParser $ \a -> [(Right x, a)]
+  pure x = AmbiguousParser $ \a -> [(Parsed x, a)]
   (AmbiguousParser pf) <*> (AmbiguousParser px) = AmbiguousParser $ \s ->
     [ (f' f x, rest2)
     | (f, rest1) <- pf s
     , (x, rest2) <- px rest1
     ]
     where
-      f' (Right f) (Right x) = Right $ f x
-      -- If any is Left, then result is Left
-      f' (Left f) (Left x) = Left $ f x
-      f' (Left f) (Right x) = Left $ f x
-      f' (Right f) (Left x) = Left $ f x
+      f' (Parsed f) (Parsed x) = Parsed $ f x
+      -- If any is Suggested, then result is Suggested
+      f' (Suggested f) (Suggested x) = Suggested $ f x
+      f' (Suggested f) (Parsed x) = Suggested $ f x
+      f' (Parsed f) (Suggested x) = Suggested $ f x
 
 
 option :: AmbiguousParser a -> AmbiguousParser a -> AmbiguousParser a
@@ -124,8 +143,8 @@ option p q = anyOf [p, q]
 char :: Char -> AmbiguousParser Char
 char c = AmbiguousParser
   (\case
-    x:xs | x == c -> [(Right x, xs)]
-    [] -> [(Left c, [])]
+    x:xs | x == c -> [(Parsed x, xs)]
+    [] -> [(Suggested c, [])]
     _ -> []
   )
 
@@ -146,7 +165,7 @@ anyOf parsers = AmbiguousParser $ \s -> mconcat
 anyOfSuggestionOnce :: [AmbiguousParser a] -> AmbiguousParser a
 anyOfSuggestionOnce parsers = AmbiguousParser $ \s ->
   ( takeWhileAndOne
-    (\x -> isRight (fst x) && "" /= snd x)
+    (\x -> isParsed (fst x) && "" /= snd x)
     ( mconcat $ takeWhile (not . null) $ map
       (`parse` s)
       parsers
@@ -180,21 +199,21 @@ prefix x = setSuggestion x $ anyOf $ map (fmap (const x) . string) $ reverse $ d
 
 eatAll :: String -> AmbiguousParser String
 eatAll suggestion = AmbiguousParser $ \case
-  "" -> [(Left suggestion, "")]
-  x -> [(Right x, "")]
+  "" -> [(Suggested suggestion, "")]
+  x -> [(Parsed x, "")]
 
 word :: String -> AmbiguousParser String
 word suggestion = AmbiguousParser $ \case
-  "" -> [(Left suggestion, "")]
+  "" -> [(Suggested suggestion, "")]
   x ->
-    [( Right $ takeWhile (/= ' ') x
+    [( Parsed $ takeWhile (/= ' ') x
     , drop 1 $ dropWhile (/= ' ') x
     )]
 
 anyString :: String -> AmbiguousParser String
 anyString suggestion = AmbiguousParser $ \case
-  "" -> [(Left suggestion, "")]
-  x -> map (first Right) (splits x)
+  "" -> [(Suggested suggestion, "")]
+  x -> map (first Parsed) (splits x)
 
 splits :: [a] -> [([a], [a])]
 splits [] = []
