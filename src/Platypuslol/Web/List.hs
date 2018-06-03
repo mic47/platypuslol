@@ -76,7 +76,7 @@ listOfCommands commands = do
   H.p "List of available commands:"
   H.ul $ mapM_
     (H.li . toLink)
-    (sort $ map (\(a, _, _) -> a) $ suggestAll commands "")
+    (sort $ map parsedText $ suggestAll commands "")
   where
     toLink query = H.a
       (H.toHtml query)

@@ -3,6 +3,7 @@ module Platypuslol.Types
   , urlRedirect
   , mkCommand
   , Action(..)
+  , ParsedCommand(..)
   ) where
 
 import Data.List
@@ -15,17 +16,27 @@ data Action
   = UrlRedirect Text
   deriving (Show)
 
+data ParsedCommand = ParsedCommand
+  { parsedText :: String
+  , parsedQueryParams :: Text
+  , parsedAction :: Action
+  }
+
 -- TODO: remove strings
-type Command = AmbiguousParser (String, Text, Action)
+type Command = AmbiguousParser ParsedCommand
 
 mkCommand
-  :: AmbiguousParser (a, b)
-  -> (b -> s)
-  -> (b -> c)
-  -> AmbiguousParser (a, s, c)
+  :: AmbiguousParser (String, b)
+  -> (b -> Text)
+  -> (b -> Action)
+  -> AmbiguousParser ParsedCommand
 mkCommand commandWithParam showable fun = do
   cwp <- commandWithParam
-  pure (fst cwp, showable $ snd cwp, fun $ snd cwp)
+  pure ParsedCommand
+    { parsedText = fst cwp
+    , parsedQueryParams = showable $ snd cwp
+    , parsedAction = fun $ snd cwp
+    }
 
 -- TODO: this will probably have existing implementation
 -- in the standard library.

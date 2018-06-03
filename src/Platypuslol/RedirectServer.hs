@@ -103,7 +103,7 @@ suggestCommand commands [("q", Just query)] = responseBuilder
     "[\"" <> query <> "\",["
     <> mconcat
       ( intersperse ","
-      $ map (pack . show . (\(a, _, _) -> a))
+      $ map (pack . show . parsedText)
       $ take 20
       $ tryAgain $ parseThenSuggest commands (unpack query)
       )
@@ -122,11 +122,11 @@ redirectCommand
 redirectCommand defaultResponse commands [("q", Just query)] =
   case parseAll commands (unpack query) of
     [] -> actionToResponse $ defaultResponse query
-    [(_, _, x)] -> actionToResponse x
+    [x] -> actionToResponse $ parsedAction x
     responses -> selectActionResponse responses
 redirectCommand _ _ _ = wrongQuery
 
-selectActionResponse :: [(String, Text, Action)] -> Response
+selectActionResponse :: [ParsedCommand] -> Response
 selectActionResponse actions = responseBuilder
   status200
   [("Content-Type", "text/html")]
@@ -136,7 +136,7 @@ selectActionResponse actions = responseBuilder
       H.p "Too many matches. Please select the right query."
       H.ul $ mapM_ (H.li . toLink) actions
   where
-    toLink (name, params, UrlRedirect destination) =
+    toLink (ParsedCommand name params (UrlRedirect destination)) =
       H.a
         (H.toHtml $
           "Redirect action \"" <> pack name <> "\" with query \"" <> params <> "\""
