@@ -6,7 +6,7 @@ module Platypuslol.Types
   ) where
 
 import Data.List
-import Data.Text (Text, replace)
+import Data.Text (Text, replace, isPrefixOf)
 
 import Platypuslol.AmbiguousParser
 import Platypuslol.Util
@@ -34,9 +34,10 @@ urlRedirect :: Text -> [(Text, Text)] -> Action
 urlRedirect template replacements = UrlRedirect $ foldl'
   (\template' (haystack, replacement) -> replace
     haystack
-    (urlEncodeText replacement)
+    (encode haystack replacement)
     template'
   )
   template
   replacements
-
+  where
+    encode x = if "!" `Data.Text.isPrefixOf` x then id else urlEncodeText
