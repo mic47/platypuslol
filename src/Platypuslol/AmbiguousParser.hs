@@ -11,6 +11,7 @@ module Platypuslol.AmbiguousParser
   , anyOf
   , many
   , many1
+  , suggestInstead
   , eatAll
   , word
   , anyString
@@ -193,6 +194,13 @@ many parser = anyOfSuggestionOnce $ pure [] : map (`repeatParser` parser) [1,2..
 
 many1 :: AmbiguousParser a -> AmbiguousParser [a]
 many1 parser = anyOfSuggestionOnce $ map (`repeatParser` parser) [1,2..]
+
+-- | Change suggestion of this parser (but nothing nested isnside) into
+-- arbitrary sggestion.
+suggestInstead :: a -> AmbiguousParser a -> AmbiguousParser a
+suggestInstead suggestion (AmbiguousParser p) = AmbiguousParser $ \case
+  "" -> [(Suggested suggestion, "")]
+  x -> p x
 
 prefix :: String -> AmbiguousParser String
 prefix x = setSuggestion x $ anyOf $ map (fmap (const x) . string) $ reverse $ drop 1 $ inits x

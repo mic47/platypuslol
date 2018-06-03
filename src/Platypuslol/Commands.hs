@@ -3,6 +3,7 @@ module Platypuslol.Commands
   , defaultCommand
   , queryParser
   , QueryLang(..)
+  , mkSubstututionQuery
   ) where
 
 import Data.List
@@ -14,7 +15,11 @@ import Platypuslol.Types
 defaultCommand :: Text -> Action
 defaultCommand query = urlRedirect
   "https://www.google.com/search?q={query}"
-  [("{query}", query)]
+  [ Substitution
+    { needle = "{query}"
+    , replacement = query
+    }
+  ]
 
 -- TODO: maybe add non-prefix words?
 data QueryLang
@@ -31,24 +36,42 @@ toQueryLang w@('[':_) = OptionalWord w
 toQueryLang w@('<':_) = QueryWord w
 toQueryLang w = PrefixWord w
 
-queryParser :: [QueryLang] -> AmbiguousParser ([String], [(Text, Text)])
-queryParser [] = pure ([], [])
+queryParser :: [QueryLang] -> AmbiguousParser (ParsedQuery Text [String])
+queryParser [] = pure $ ParsedQuery [] []
 queryParser (q:qs) = do
   parse <- case q of
-    PrefixWord w -> (, []) <$> prefix w
-    OptionalWord w -> (, []) <$> anyOf [string w, pure ""]
+    PrefixWord w -> ParsedQuery [] <$> prefix w
+    OptionalWord w -> ParsedQuery [] <$> anyOf [string w, pure ""]
     QueryWord w -> do
       query <- word "<WORD>"
-      pure (query, [(pack w, pack query)])
+      pure ParsedQuery
+        { parsedQuery = query
+        , parsedSubstitutions =
+          [ Substitution
+            { needle = pack w
+            , replacement = pack query
+            }
+          ]
+        }
     QueryString w -> do
       query <- case qs of
         [] -> eatAll "<QUERY>"
         _ -> anyString "<QUERY>"
-      pure (query, [(pack w, pack query)])
+      pure ParsedQuery
+        { parsedQuery = query
+        , parsedSubstitutions =
+          [ Substitution
+            { needle = pack w
+            , replacement = pack query
+            }
+          ]
+        }
   _ <- spaceType
   parse' <- queryParser qs
-  pure 
-    (fst parse:fst parse', snd parse ++ snd parse')
+  pure ParsedQuery
+    { parsedQuery = parsedQuery parse:parsedQuery parse'
+    , parsedSubstitutions = parsedSubstitutions parse ++ parsedSubstitutions parse'
+    }
     where
       spaceType = case (q, qs) of
         -- There is always space before query.
@@ -61,14 +84,17 @@ queryParser (q:qs) = do
         (QueryString{}, PrefixWord{}:_) -> space1
         _ -> space
 
-queryParser' :: [QueryLang] -> AmbiguousParser (String, [(Text, Text)])
-queryParser' = fmap (\(x, a) -> (mconcat $ intersperse " " x, a)) . queryParser
+queryParser' :: [QueryLang] -> AmbiguousParser (ParsedQuery Text String)
+queryParser' = fmap (fmap (mconcat . intersperse " ")) . queryParser
 
 simpleRedirect :: String -> Text -> Command
 simpleRedirect command redirectTemplate = mkCommand
   (queryParser' $ map toQueryLang $ words command)
-  (mconcat . intersperse "|" . map snd)
+  (mconcat . intersperse "|" . map replacement)
   (urlRedirect redirectTemplate)
+
+mkSubstututionQuery :: (String, String) -> AmbiguousParser (String, String)
+mkSubstututionQuery x = fmap (const x) (prefix $ fst x)
 
 commands :: [(String, Text)] -> Command
 commands config = anyOf $ map (uncurry simpleRedirect) config

@@ -4,6 +4,8 @@ module Platypuslol.Types
   , mkCommand
   , Action(..)
   , ParsedCommand(..)
+  , ParsedQuery(..)
+  , Substitution(..)
   ) where
 
 import Data.List
@@ -25,27 +27,40 @@ data ParsedCommand = ParsedCommand
 -- TODO: remove strings
 type Command = AmbiguousParser ParsedCommand
 
+data Substitution a = Substitution
+  { needle :: a
+  , replacement :: a
+  }
+
+data ParsedQuery a b = ParsedQuery
+ { parsedSubstitutions :: [Substitution a]
+ , parsedQuery :: b
+ }
+
+instance Functor (ParsedQuery a) where
+  fmap f (ParsedQuery a b) = ParsedQuery a (f b)
+
 mkCommand
-  :: AmbiguousParser (String, b)
-  -> (b -> Text)
-  -> (b -> Action)
+  :: AmbiguousParser (ParsedQuery b String)
+  -> ([Substitution b] -> Text)
+  -> ([Substitution b] -> Action)
   -> AmbiguousParser ParsedCommand
 mkCommand commandWithParam showable fun = do
   cwp <- commandWithParam
   pure ParsedCommand
-    { parsedText = fst cwp
-    , parsedQueryParams = showable $ snd cwp
-    , parsedAction = fun $ snd cwp
+    { parsedText = parsedQuery cwp
+    , parsedQueryParams = showable $ parsedSubstitutions cwp
+    , parsedAction = fun $ parsedSubstitutions cwp
     }
 
 -- TODO: this will probably have existing implementation
 -- in the standard library.
 -- TODO2: use haystack.
-urlRedirect :: Text -> [(Text, Text)] -> Action
+urlRedirect :: Text -> [Substitution Text] -> Action
 urlRedirect template replacements = UrlRedirect $ foldl'
-  (\template' (haystack, replacement) -> replace
-    haystack
-    (encode haystack replacement)
+  (\template' subst -> replace
+    (needle subst)
+    (encode (needle subst) (replacement subst))
     template'
   )
   template
