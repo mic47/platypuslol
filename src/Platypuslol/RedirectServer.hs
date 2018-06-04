@@ -40,7 +40,7 @@ redirectServer
 -- TODO: this is getting out of hand. There should be reader monad so that
 -- request have access to all necessary data.
 redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req respond = do
-    -- putStrLn $ show req
+    -- print req
     commands <- atomically $ getCommandParser commandStore
     (params', _files) <- parseRequestBodyEx
       (setMaxRequestFileSize (1024*1024) defaultParseRequestBodyOptions)
