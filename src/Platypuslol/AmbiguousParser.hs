@@ -4,6 +4,8 @@ module Platypuslol.AmbiguousParser
   , suggestAll
   , parseThenSuggest
   , setSuggestion
+  , subsequenceWord
+  , predicateWord
   , char
   , string
   , prefix
@@ -201,6 +203,19 @@ suggestInstead :: a -> AmbiguousParser a -> AmbiguousParser a
 suggestInstead suggestion (AmbiguousParser p) = AmbiguousParser $ \case
   "" -> [(Suggested suggestion, "")]
   x -> p x
+
+predicateWord :: a -> (String -> Bool) -> AmbiguousParser a
+predicateWord item predicate = AmbiguousParser $ \case
+  "" -> [(Suggested item, "")]
+  what -> 
+    let (wrd, rest) = span (/=' ') what
+    in
+      [ (Parsed item, rest)
+      | predicate wrd
+      ]
+
+subsequenceWord :: String -> AmbiguousParser String
+subsequenceWord x = predicateWord x (`isSubsequenceOf` x)
 
 prefix :: String -> AmbiguousParser String
 prefix x = setSuggestion x $ anyOf $ map (fmap (const x) . string) $ reverse $ drop 1 $ inits x
