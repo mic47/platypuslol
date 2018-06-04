@@ -3,10 +3,14 @@ module Platypuslol.Commands
   , defaultCommand
   , queryParser
   , QueryLang(..)
-  , mkSubstututionQuery
+  , mkSubstitutionQuery
+  , SubstitutionQueries
   ) where
 
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import Data.List
+import Data.Maybe
 import Data.Text (Text, pack)
 
 import Platypuslol.AmbiguousParser
@@ -27,18 +31,22 @@ data QueryLang
   | OptionalWord String
   | QueryString String
   | QueryWord String
+  | QuerySubstitution String
   deriving (Show)
+
+type SubstitutionQueries = HashMap String (AmbiguousParser (String, String))
 
 -- TODO: use proper parser, allow escaping, but this is good start
 toQueryLang :: String -> QueryLang
 toQueryLang w@('{':_) = QueryString w
 toQueryLang w@('[':_) = OptionalWord w
 toQueryLang w@('<':_) = QueryWord w
+toQueryLang w@('!':_) = QuerySubstitution w
 toQueryLang w = PrefixWord w
 
-queryParser :: [QueryLang] -> AmbiguousParser (ParsedQuery Text [String])
-queryParser [] = pure $ ParsedQuery [] []
-queryParser (q:qs) = do
+queryParser :: SubstitutionQueries -> [QueryLang] -> AmbiguousParser (ParsedQuery Text [String])
+queryParser _ [] = pure $ ParsedQuery [] []
+queryParser substitutions (q:qs) = do
   parse <- case q of
     PrefixWord w -> ParsedQuery [] <$> prefix w
     OptionalWord w -> ParsedQuery [] <$> anyOf [string w, pure ""]
@@ -66,8 +74,22 @@ queryParser (q:qs) = do
             }
           ]
         }
+    QuerySubstitution w -> suggestInstead (ParsedQuery [] (' ':w)) $ do
+      ws <- space1
+      query <- fromMaybe
+        ((\x -> (x, x)) <$> word "<QUERY>")
+        (HashMap.lookup w substitutions)
+      pure ParsedQuery
+        { parsedQuery = ws ++ fst query
+        , parsedSubstitutions =
+          [ Substitution
+            { needle = pack w
+            , replacement = pack $ snd query
+            }
+          ]
+        }
   _ <- spaceType
-  parse' <- queryParser qs
+  parse' <- queryParser substitutions qs
   pure ParsedQuery
     { parsedQuery = parsedQuery parse:parsedQuery parse'
     , parsedSubstitutions = parsedSubstitutions parse ++ parsedSubstitutions parse'
@@ -77,24 +99,24 @@ queryParser (q:qs) = do
         -- There is always space before query.
         (_, QueryString{}:_) -> space1
         (_, QueryWord{}:_) -> space1
+        (_, QuerySubstitution{}:_) -> pure ""
         -- There is always space after query, if non-query follows.
-        (QueryWord{}, OptionalWord{}:_) -> space1
-        (QueryWord{}, PrefixWord{}:_) -> space1
-        (QueryString{}, OptionalWord{}:_) -> space1
-        (QueryString{}, PrefixWord{}:_) -> space1
+        (QueryWord{}, _:_) -> space1
+        (QueryString{}, _:_) -> space1
+        (QuerySubstitution{}, _:_) -> space1
         _ -> space
 
-queryParser' :: [QueryLang] -> AmbiguousParser (ParsedQuery Text String)
-queryParser' = fmap (fmap (mconcat . intersperse " ")) . queryParser
+queryParser' :: SubstitutionQueries -> [QueryLang] -> AmbiguousParser (ParsedQuery Text String)
+queryParser' substitutions = fmap (fmap (mconcat . intersperse " ")) . queryParser substitutions
 
-simpleRedirect :: String -> Text -> Command
-simpleRedirect command redirectTemplate = mkCommand
-  (queryParser' $ map toQueryLang $ words command)
+simpleRedirect :: SubstitutionQueries -> String -> Text -> Command
+simpleRedirect substitutions command redirectTemplate = mkCommand
+  (queryParser' substitutions $ map toQueryLang $ words command)
   (mconcat . intersperse "|" . map replacement)
   (urlRedirect redirectTemplate)
 
-mkSubstututionQuery :: (String, String) -> AmbiguousParser (String, String)
-mkSubstututionQuery x = fmap (const x) (prefix $ fst x)
+mkSubstitutionQuery :: (String, String) -> AmbiguousParser (String, String)
+mkSubstitutionQuery x = fmap (const x) (subsequenceWord $ fst x)
 
-commands :: [(String, Text)] -> Command
-commands config = anyOf $ map (uncurry simpleRedirect) config
+commands :: [(String, Text)] -> SubstitutionQueries -> Command
+commands config subs = anyOf $ map (uncurry $ simpleRedirect subs) config
