@@ -30,9 +30,20 @@ import Control.Arrow
 import Data.List
 import Data.Either
 import Data.Maybe
+import Data.Semigroup hiding (option)
+
+newtype Score = Score Double
+  deriving (Show, Eq, Ord)
+
+instance Semigroup Score where
+  (<>) (Score a) (Score b) = Score (a * b)
+
+instance Monoid Score where
+  mempty = Score 1.0
+  mappend = (<>)
 
 data ParserResult a
-  = Parsed a
+  = Parsed a Score
   | Suggested a
   deriving (Show)
 
@@ -45,10 +56,13 @@ isSuggested Parsed{} = False
 isSuggested Suggested{} = True
 
 partitionParserResult :: [ParserResult a] -> ([a], [a])
-partitionParserResult = partitionEithers . map pToE
+partitionParserResult = fmap sortResults . partitionEithers . map pToEither
   where
-    pToE (Parsed x) = Right x
-    pToE (Suggested x) = Left x
+    pToEither (Parsed x s) = Right (x, s)
+    pToEither (Suggested x) = Left x
+
+sortResults :: [(a, Score)] -> [a]
+sortResults = map fst . sortOn snd
 
 newtype AmbiguousParser a = AmbiguousParser
   { parse :: String -> [(ParserResult a, String)]
@@ -56,12 +70,13 @@ newtype AmbiguousParser a = AmbiguousParser
 
 parseAll :: AmbiguousParser a -> String -> [a]
 parseAll (AmbiguousParser p) =
-  mapMaybe (rightToMaybe . fst)
+  sortResults
+  . mapMaybe (rightToMaybe . fst)
   . filter (("" ==) . snd)
   . filter (isParsed . fst)
   . p
   where
-    rightToMaybe (Parsed x) = Just x
+    rightToMaybe (Parsed x s) = Just (x, s)
     rightToMaybe Suggested{} = Nothing
 
 parseThenSuggest :: AmbiguousParser a -> String -> [a]
@@ -104,7 +119,7 @@ ateMore
   :: (ParserResult (Int, a), String)
   -> (ParserResult (Int, a), String)
   -> Ordering
-ateMore (Parsed a, _) (Parsed b, _) = compare (fst b) (fst a)
+ateMore (Parsed a _, _) (Parsed b _, _) = compare (fst b) (fst a)
 ateMore (Parsed{}, _) _ = LT
 ateMore (Suggested a, _) (Suggested b, _) = compare (fst b) (fst a)
 ateMore _ _ = GT
@@ -123,21 +138,21 @@ instance Functor AmbiguousParser where
   fmap f (AmbiguousParser p) = AmbiguousParser $ map (first f') . p
     where
       f' (Suggested a) = Suggested $ f a
-      f' (Parsed a) = Parsed $ f a
+      f' (Parsed a x) = Parsed (f a) x
 
 instance Applicative AmbiguousParser where
-  pure x = AmbiguousParser $ \a -> [(Parsed x, a)]
+  pure x = AmbiguousParser $ \a -> [(Parsed x mempty, a)]
   (AmbiguousParser pf) <*> (AmbiguousParser px) = AmbiguousParser $ \s ->
     [ (f' f x, rest2)
     | (f, rest1) <- pf s
     , (x, rest2) <- px rest1
     ]
     where
-      f' (Parsed f) (Parsed x) = Parsed $ f x
+      f' (Parsed f fs) (Parsed x xs) = Parsed (f x) (fs <> xs)
       -- If any is Suggested, then result is Suggested
       f' (Suggested f) (Suggested x) = Suggested $ f x
-      f' (Suggested f) (Parsed x) = Suggested $ f x
-      f' (Parsed f) (Suggested x) = Suggested $ f x
+      f' (Suggested f) (Parsed x _) = Suggested $ f x
+      f' (Parsed f _) (Suggested x) = Suggested $ f x
 
 
 option :: AmbiguousParser a -> AmbiguousParser a -> AmbiguousParser a
@@ -146,7 +161,7 @@ option p q = anyOf [p, q]
 char :: Char -> AmbiguousParser Char
 char c = AmbiguousParser
   (\case
-    x:xs | x == c -> [(Parsed x, xs)]
+    x:xs | x == c -> [(Parsed x mempty, xs)]
     [] -> [(Suggested c, [])]
     _ -> []
   )
@@ -204,18 +219,52 @@ suggestInstead suggestion (AmbiguousParser p) = AmbiguousParser $ \case
   "" -> [(Suggested suggestion, "")]
   x -> p x
 
-predicateWord :: a -> (String -> Bool) -> AmbiguousParser a
+predicateWord :: a -> (String -> Maybe Score) -> AmbiguousParser a
 predicateWord item predicate = AmbiguousParser $ \case
   "" -> [(Suggested item, "")]
-  what -> 
+  what ->
     let (wrd, rest) = span (/=' ') what
     in
-      [ (Parsed item, rest)
-      | predicate wrd
+      [ (Parsed item score, rest)
+      | (Just score) <- [predicate wrd]
       ]
 
+isSubsequenceAndGetSpan :: String -> String -> Maybe Int
+isSubsequenceAndGetSpan needle haystack = isSubsequenceAndGetSpan'
+  (zip needle (repeat Nothing))
+  haystack
+  0
+
+isSubsequenceAndGetSpan' :: [(Char, Maybe Int)] -> String -> Int -> Maybe Int
+isSubsequenceAndGetSpan' [] _ _ =  Just 0
+isSubsequenceAndGetSpan' x [] index = (index-) <$> snd (last x)
+isSubsequenceAndGetSpan' state@((firstChar, firstLen): rest) (hd:restInput) index =
+  let
+    updatedState =
+      ( (if firstChar == hd then (firstChar, Just index) else (firstChar, firstLen))
+      : zipWith stepUpdate state rest
+      )
+    distance = (1+) . (index -) <$> snd (last updatedState)
+  in
+    minState distance $ isSubsequenceAndGetSpan'
+      updatedState
+      restInput
+      (index + 1)
+  where
+    stepUpdate (_, prevIndex) x@(actChar, actIndex) =
+       if hd == actChar then (actChar, latestIndex prevIndex actIndex) else x
+    latestIndex Nothing a = a
+    latestIndex a Nothing = a
+    latestIndex a b = max <$> a <*> b
+    minState Nothing a = a
+    minState a Nothing = a
+    minState a b = min <$> a <*> b
+
+
 subsequenceWord :: String -> AmbiguousParser String
-subsequenceWord x = predicateWord x (`isSubsequenceOf` x)
+subsequenceWord w = predicateWord w (`toScore` w)
+  where
+  toScore x y = Score <$> ((/ fromIntegral (length x)) . fromIntegral <$> x `isSubsequenceAndGetSpan` y)
 
 prefix :: String -> AmbiguousParser String
 prefix x = setSuggestion x $ anyOf $ map (fmap (const x) . string) $ reverse $ drop 1 $ inits x
@@ -223,20 +272,20 @@ prefix x = setSuggestion x $ anyOf $ map (fmap (const x) . string) $ reverse $ d
 eatAll :: String -> AmbiguousParser String
 eatAll suggestion = AmbiguousParser $ \case
   "" -> [(Suggested suggestion, "")]
-  x -> [(Parsed x, "")]
+  x -> [(Parsed x mempty, "")]
 
 word :: String -> AmbiguousParser String
 word suggestion = AmbiguousParser $ \case
   "" -> [(Suggested suggestion, "")]
   x ->
-    [( Parsed $ takeWhile (/= ' ') x
+    [( Parsed (takeWhile (/= ' ') x) mempty
     , drop 1 $ dropWhile (/= ' ') x
     )]
 
 anyString :: String -> AmbiguousParser String
 anyString suggestion = AmbiguousParser $ \case
   "" -> [(Suggested suggestion, "")]
-  x -> map (first Parsed) (splits x)
+  x -> map (first (`Parsed` mempty)) (splits x)
 
 splits :: [a] -> [([a], [a])]
 splits [] = []
