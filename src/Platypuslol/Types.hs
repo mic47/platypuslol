@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Platypuslol.Types
   ( Command
   , urlRedirect
@@ -8,6 +9,8 @@ module Platypuslol.Types
   , Substitution(..)
   ) where
 
+import Data.Aeson
+import GHC.Generics
 import Data.List
 import Data.Text (Text, replace, isPrefixOf)
 
@@ -16,13 +19,13 @@ import Platypuslol.Util
 
 data Action
   = UrlRedirect Text
-  deriving (Show)
+  deriving (Show, Generic, ToJSON, FromJSON)
 
 data ParsedCommand = ParsedCommand
   { parsedText :: String
   , parsedQueryParams :: Text
   , parsedAction :: Action
-  }
+  } deriving (Show, Generic, ToJSON, FromJSON)
 
 -- TODO: remove strings
 type Command = AmbiguousParser ParsedCommand

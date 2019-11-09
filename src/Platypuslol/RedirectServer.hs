@@ -2,10 +2,12 @@ module Platypuslol.RedirectServer
   ( redirectServer
   ) where
 
+import Data.Aeson
 import Blaze.ByteString.Builder.Char.Utf8
 import Control.Monad.STM
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
+import qualified Data.ByteString.Lazy as LBS
 import Text.Blaze.Html.Renderer.Text
 import Network.Wai
 import Network.Wai.Parse
@@ -64,6 +66,9 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req
       ["suggest"] -> return $ suggestCommand
         commands
         allParams
+      ["debug"] -> return $ debugCommand
+        commands
+        allParams
       ["list"] -> listCommands commands params configDir
       [icon] | Set.member icon icons -> returnIcon icon
       [] -> installResponse
@@ -91,6 +96,18 @@ redirectServer defaultRedirect (urlPrefix, defServer) commandStore configDir req
       , "favicon-96x96.png"
       , "favicon.ico"
       ]
+
+debugCommand
+  :: Command
+  -> [(Text, Maybe Text)]
+  -> Response
+debugCommand commands [("q", Just query)] = do
+  let actions = parseAll commands (unpack query)
+  responseBuilder
+    status200
+    [("Content-Type", "application/json")]
+    ((fromText . decodeUtf8 . LBS.toStrict . encode . toJSON) actions)
+
 
 suggestCommand
   :: Command
