@@ -30,7 +30,7 @@ remoteUrlToGithubUserAndNameStr :: String -> Maybe String
 remoteUrlToGithubUserAndNameStr rUrl = stripSuffix ".git" =<< stripPrefix "git@github.com:" rUrl
 
 remoteUrlToRepoName :: String -> String
-remoteUrlToRepoName = drop 1 . dropWhile (/= '/')
+remoteUrlToRepoName = drop 1 . dropWhile (/= '/') . fromMaybe "" . remoteUrlToGithubUserAndNameStr
 
 extractRepoInfo :: FilePath -> IO GitRepo
 extractRepoInfo filePath = do
