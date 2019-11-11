@@ -7,7 +7,6 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.STM
 import Data.List
-import Data.Monoid
 import qualified Data.HashMap.Strict as HashMap
 import Data.Text (pack)
 import Network.Wai.Handler.Warp
@@ -20,6 +19,7 @@ import System.FSNotify
 import qualified Platypuslol.Commands as PC
 import Platypuslol.AmbiguousParser (anyOf)
 import Platypuslol.CommandStore
+import Platypuslol.Commands
 import Platypuslol.RedirectServer
 import Platypuslol.Types
 import Paths_platypuslol
@@ -30,7 +30,7 @@ data Options = Options
   , useTls :: Bool
   , tlsCertFile :: String
   , tlsKeyFile :: String
-  }
+  } deriving (Show)
 
 optionsParser :: Parser Options
 optionsParser = Options
@@ -69,7 +69,17 @@ parseOptions = execParser
 loadSubstitutions :: Options -> IO PC.SubstitutionQueries
 loadSubstitutions Options{..} = do
   files <- filter (isSuffixOf ".conf") <$> listDirectory substDir
-  HashMap.fromList <$> mapM loadFile files
+  HashMap.map
+    ( fmap
+      (\x ->
+        SubstitutionQuery
+        { searchedValue = fst x
+        , replacements = [Substitution {needle = "", replacement = snd x}]
+        }
+      )
+    )
+    . HashMap.fromList
+    <$> mapM loadFile files
   where
     substDir = localConfigDir </> "substitutions"
     loadFile filename = do
@@ -81,14 +91,14 @@ loadSubstitutions Options{..} = do
 
 loadCommandParser :: Options -> IO Command
 loadCommandParser opts@Options{..} = do
-  localConfig <- (read <$> readFile (localConfigDir </> "commands.conf"))
+  localConfig <- read <$> readFile (localConfigDir </> "commands.conf")
     `catch` \(_ :: SomeException) -> (return [])
-  localDB <- (read <$> readFile (localConfigDir </> "db.conf"))
+  localDB <- read <$> readFile (localConfigDir </> "db.conf")
     `catch` \(_ :: SomeException) -> (return [])
   globalConfigFile <- getDataFileName "resources/commands.conf"
-  globalConfig <- (read <$> readFile globalConfigFile)
+  globalConfig <- read <$> readFile globalConfigFile
   substitutions <- loadSubstitutions opts
-  return $ PC.commands 
+  return $ PC.commands
     (localConfig ++ globalConfig ++ localDB)
     substitutions
 
