@@ -1,20 +1,29 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module Platypuslol.Commands
   ( commands
   , defaultCommand
   , queryParser
   , QueryLang(..)
   , mkSubstitutionQuery
+  , substitutionQueryParser
   , SubstitutionQueries
+  , SubstitutionQuery(..)
+  , toSubstitutionQuery
   ) where
 
+import Data.Aeson
+import GHC.Generics
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List
 import Data.Maybe
 import Data.Text (Text, pack)
+import qualified Text.ParserCombinators.Parsec as P
 
 import Platypuslol.AmbiguousParser
 import Platypuslol.Types
+
+import Debug.Trace
 
 defaultCommand :: Text -> Action
 defaultCommand query = urlRedirect
@@ -31,18 +40,53 @@ data QueryLang
   | OptionalWord String
   | QueryString String
   | QueryWord String
-  | QuerySubstitution String
+  | QuerySubstitution String String
   deriving (Show)
 
-type SubstitutionQueries = HashMap String (AmbiguousParser (String, String))
+
+-- Type, subtype, value
+data SubstitutionQuery = SubstitutionQuery
+  { searchedValue :: String
+  , replacements :: [Substitution String]
+  } deriving (Show, Generic, ToJSON, FromJSON)
+
+type SubstitutionQueries = HashMap String (AmbiguousParser SubstitutionQuery)
+
+substitutionQueryParser :: SubstitutionQuery -> AmbiguousParser SubstitutionQuery
+substitutionQueryParser q = fmap (const q) (subsequenceWord (searchedValue q))
+
+toSubstitutionQuery
+  :: (ToSubstitutions a)
+  => String
+  -> a
+  -> Maybe SubstitutionQuery
+toSubstitutionQuery key x = case listToMaybe (filter (\y -> key == needle y) repls) of
+  Nothing -> Nothing
+  Just val -> Just SubstitutionQuery
+    { searchedValue = replacement val
+    , replacements = repls
+    }
+  where
+  repls = toSubstitutions x
 
 -- TODO: use proper parser, allow escaping, but this is good start
 toQueryLang :: String -> QueryLang
 toQueryLang w@('{':_) = QueryString w
 toQueryLang w@('[':_) = OptionalWord w
 toQueryLang w@('<':_) = QueryWord w
-toQueryLang w@('!':_) = QuerySubstitution w
+toQueryLang w@('!':_) = case P.parse substQueryParser "" w of
+  Right ret -> ret
+  Left _ -> PrefixWord w
 toQueryLang w = PrefixWord w
+
+substQueryParser :: P.GenParser Char st QueryLang
+substQueryParser = do
+  type_ <- P.char ('!' :: Char) *> P.many (P.noneOf "!:")
+  name <- P.optionMaybe $ do
+    _ <- P.char ':'
+    P.many (P.noneOf "!")
+  _ <- P.char '!'
+  pure $ QuerySubstitution ("!" <> type_ <> "!") (fromMaybe type_ name)
 
 queryParser :: SubstitutionQueries -> [QueryLang] -> AmbiguousParser (ParsedQuery Text [String])
 queryParser _ [] = pure $ ParsedQuery [] []
@@ -74,18 +118,19 @@ queryParser substitutions (q:qs) = do
             }
           ]
         }
-    QuerySubstitution w -> suggestInstead (ParsedQuery [] (' ':w)) $ do
+    QuerySubstitution type_ name -> suggestInstead (ParsedQuery [] (' ':name)) $ do
       ws <- space1
-      query <- fromMaybe
-        ((\x -> (x, x)) <$> word "<QUERY>")
-        (HashMap.lookup w substitutions)
+      query <- trace (show $ HashMap.keys substitutions) $ traceShowId <$> fromMaybe
+        ((\x -> SubstitutionQuery x [Substitution "" x]) <$> word (trace "oppd" "<QUERY>"))
+        (HashMap.lookup (traceShowId type_) substitutions)
       pure ParsedQuery
-        { parsedQuery = ws ++ fst query
+        { parsedQuery = ws ++ searchedValue query
         , parsedSubstitutions =
           [ Substitution
-            { needle = pack w
-            , replacement = pack $ snd query
+            { needle = pack (mconcat ["!", name, ".", needle s, "!"])
+            , replacement = pack $ replacement s
             }
+          | s <- replacements query
           ]
         }
   _ <- spaceType

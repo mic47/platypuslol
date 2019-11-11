@@ -7,6 +7,7 @@ module Platypuslol.Types
   , ParsedCommand(..)
   , ParsedQuery(..)
   , Substitution(..)
+  , ToSubstitutions(..)
   ) where
 
 import Data.Aeson
@@ -33,15 +34,19 @@ type Command = AmbiguousParser ParsedCommand
 data Substitution a = Substitution
   { needle :: a
   , replacement :: a
-  }
+  } deriving (Show, Generic, ToJSON, FromJSON)
 
 data ParsedQuery a b = ParsedQuery
  { parsedSubstitutions :: [Substitution a]
  , parsedQuery :: b
- }
+ } deriving (Show, Generic, ToJSON, FromJSON)
+
 
 instance Functor (ParsedQuery a) where
   fmap f (ParsedQuery a b) = ParsedQuery a (f b)
+
+class ToSubstitutions a where
+  toSubstitutions :: a -> [Substitution String]
 
 mkCommand
   :: AmbiguousParser (ParsedQuery b String)

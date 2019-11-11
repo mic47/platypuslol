@@ -6,7 +6,10 @@ module Main
 import Control.Exception
 import Control.Monad
 import Control.Monad.STM
+import qualified Data.Aeson as Aeson
 import Data.List
+import Data.Maybe
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.HashMap.Strict as HashMap
 import Data.Text (pack)
 import Network.Wai.Handler.Warp
@@ -20,6 +23,7 @@ import qualified Platypuslol.Commands as PC
 import Platypuslol.AmbiguousParser (anyOf)
 import Platypuslol.CommandStore
 import Platypuslol.Commands
+import Platypuslol.Git
 import Platypuslol.RedirectServer
 import Platypuslol.Types
 import Paths_platypuslol
@@ -89,6 +93,29 @@ loadSubstitutions Options{..} = do
         , anyOf $ map PC.mkSubstitutionQuery subst
         )
 
+loadGitHub :: Options -> IO PC.SubstitutionQueries
+loadGitHub Options{..} = do
+  -- TODO: barf on wrong decode
+  repoPaths :: [FilePath]  <-
+    fromMaybe []
+    . Aeson.decode
+    <$> LBS.readFile (localConfigDir </> "git-repositories.json")
+  repositories <- mapM extractRepoInfo repoPaths
+  localBranches <- mconcat <$> mapM (extractBranches False) repoPaths
+  remoteBranches <- mconcat <$> mapM (extractBranches True) repoPaths
+  pure (HashMap.fromList
+    [ ("!repo!", mkParser "repo" repositories)
+    , ("!lbranch!", mkParser "repo/branch" localBranches)
+    , ("!rbranch!", mkParser "repo/branch" remoteBranches)
+    ])
+  where
+  mkParser item =
+    anyOf
+    . mapMaybe
+      ( fmap substitutionQueryParser
+      . toSubstitutionQuery item
+      )
+
 loadCommandParser :: Options -> IO Command
 loadCommandParser opts@Options{..} = do
   localConfig <- read <$> readFile (localConfigDir </> "commands.conf")
@@ -98,9 +125,10 @@ loadCommandParser opts@Options{..} = do
   globalConfigFile <- getDataFileName "resources/commands.conf"
   globalConfig <- read <$> readFile globalConfigFile
   substitutions <- loadSubstitutions opts
+  github <- loadGitHub opts
   return $ PC.commands
     (localConfig ++ globalConfig ++ localDB)
-    substitutions
+    (substitutions <> github)
 
 main :: IO ()
 main = do

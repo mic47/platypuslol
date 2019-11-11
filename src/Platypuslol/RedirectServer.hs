@@ -13,7 +13,6 @@ import Network.Wai
 import Network.Wai.Parse
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as Set
-import Data.Monoid
 import Network.HTTP.Types (status400, status404, status302, status200)
 import Data.List
 import Data.Text (Text, unpack, pack)
@@ -102,11 +101,12 @@ debugCommand
   -> [(Text, Maybe Text)]
   -> Response
 debugCommand commands [("q", Just query)] = do
-  let actions = parseAll commands (unpack query)
+  let actions = parseThenSuggest commands (unpack query)
   responseBuilder
     status200
     [("Content-Type", "application/json")]
     ((fromText . decodeUtf8 . LBS.toStrict . encode . toJSON) actions)
+debugCommand _ _ = wrongQuery
 
 
 suggestCommand
