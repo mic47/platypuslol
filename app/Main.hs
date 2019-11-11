@@ -153,6 +153,7 @@ main = do
     repoPaths <- getRepoPaths opts
     watchConfigs fsNotify localConfigDir
     mapM_ (watchConfigs fsNotify . (</> ".git/refs/heads")) repoPaths
+    mapM_ (watchConfigs fsNotify . (</> ".git/refs/remotes")) repoPaths
 
     if useTls
     then runTLS
