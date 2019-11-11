@@ -82,15 +82,19 @@ default-extensions: [
 library:
   source-dirs: src
   dependencies:
+  - aeson
   - blaze-builder
   - blaze-html
   - blaze-markup
+  - bytestring
   - filepath
   - http-types
+  - process
   - parsec
   - stm
   - text
   - text-show
+  - extra
   - unordered-containers
   - utf8-string
   - wai
@@ -108,6 +112,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - platypuslol
+    - aeson
+    - containers
+    - bytestring
     - directory
     - filepath
     - fsnotify
