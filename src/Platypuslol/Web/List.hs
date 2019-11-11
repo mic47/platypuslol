@@ -10,7 +10,6 @@ import qualified Text.Blaze.Html5.Attributes as A
 import Text.Blaze.Html.Renderer.Text
 import Network.Wai
 import qualified Data.HashMap.Strict as HashMap
-import Data.Monoid
 import Network.HTTP.Types (status200)
 import Data.List
 import Data.Text (Text, pack)

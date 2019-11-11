@@ -68,10 +68,10 @@ urlRedirect :: Text -> [Substitution Text] -> Action
 urlRedirect template replacements = UrlRedirect $ foldl'
   (\template' subst -> replace
     (needle subst)
-    (encode (needle subst) (replacement subst))
+    (encode' (needle subst) (replacement subst))
     template'
   )
   template
   replacements
   where
-    encode x = if "!" `Data.Text.isPrefixOf` x then id else urlEncodeText
+    encode' x = if "!" `Data.Text.isPrefixOf` x then id else urlEncodeText

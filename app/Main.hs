@@ -93,13 +93,15 @@ loadSubstitutions Options{..} = do
         , anyOf $ map PC.mkSubstitutionQuery subst
         )
 
+getRepoPaths :: Options -> IO [FilePath]
+getRepoPaths Options{..} = fromMaybe []
+  . Aeson.decode
+  <$> LBS.readFile (localConfigDir </> "git-repositories.json")
+
 loadGitHub :: Options -> IO PC.SubstitutionQueries
-loadGitHub Options{..} = do
+loadGitHub opts = do
   -- TODO: barf on wrong decode
-  repoPaths :: [FilePath]  <-
-    fromMaybe []
-    . Aeson.decode
-    <$> LBS.readFile (localConfigDir </> "git-repositories.json")
+  repoPaths <- getRepoPaths opts
   repositories <- mapM extractRepoInfo repoPaths
   localBranches <- mconcat <$> mapM (extractBranches False) repoPaths
   remoteBranches <- mconcat <$> mapM (extractBranches True) repoPaths
@@ -137,16 +139,20 @@ main = do
   commandParser <- loadCommandParser opts
   commandStore <- newCommandStore commandParser
   putStrLn $ "Listening on port " ++ show port
-  let defServer = "localhost:" <> pack (show port)
-  withManager $ \fsNotify -> do
-    void $ watchTree
+  let
+    defServer = "localhost:" <> pack (show port)
+    watchConfigs fsNotify directory = void $ watchTree
       fsNotify
-      localConfigDir
+      directory
       (const True)
       $ const $ do
         cmd <- loadCommandParser opts
         atomically $ setCommandParser commandStore cmd
         putStrLn "Reloaded parsers."
+  withManager $ \fsNotify -> do
+    repoPaths <- getRepoPaths opts
+    watchConfigs fsNotify localConfigDir
+    mapM_ (watchConfigs fsNotify . (</> ".git/refs/heads")) repoPaths
 
     if useTls
     then runTLS

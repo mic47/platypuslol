@@ -23,8 +23,6 @@ import qualified Text.ParserCombinators.Parsec as P
 import Platypuslol.AmbiguousParser
 import Platypuslol.Types
 
-import Debug.Trace
-
 defaultCommand :: Text -> Action
 defaultCommand query = urlRedirect
   "https://www.google.com/search?q={query}"
@@ -120,9 +118,9 @@ queryParser substitutions (q:qs) = do
         }
     QuerySubstitution type_ name -> suggestInstead (ParsedQuery [] (' ':name)) $ do
       ws <- space1
-      query <- trace (show $ HashMap.keys substitutions) $ traceShowId <$> fromMaybe
-        ((\x -> SubstitutionQuery x [Substitution "" x]) <$> word (trace "oppd" "<QUERY>"))
-        (HashMap.lookup (traceShowId type_) substitutions)
+      query <- fromMaybe
+        ((\x -> SubstitutionQuery x [Substitution "" x]) <$> word "<QUERY>")
+        (HashMap.lookup type_ substitutions)
       pure ParsedQuery
         { parsedQuery = ws ++ searchedValue query
         , parsedSubstitutions =

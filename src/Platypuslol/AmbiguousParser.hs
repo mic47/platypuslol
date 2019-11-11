@@ -30,7 +30,6 @@ import Control.Arrow
 import Data.List
 import Data.Either
 import Data.Maybe
-import Data.Semigroup hiding (option)
 
 newtype Score = Score Double
   deriving (Show, Eq, Ord)
