@@ -18,7 +18,7 @@ stack hoogle -- server --local --port=8080
 # TODO
 [ ] Git repository:
   [x] Configure list of repositories
-  [ ] Keep list of branches up to date
+  [x] Keep list of branches up to date
   [x] Be able to resolve to github repo
   [x] Have substitutions, like !branch! and then !branch.repo-base! !query.branch
   [ ] Search for files / directories, hitory and so on
