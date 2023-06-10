@@ -117,17 +117,22 @@ queryParser substitutions (q:qs) = do
           ]
         }
     QuerySubstitution type_ name -> suggestInstead (ParsedQuery [] (' ':name)) $ do
-      ws <- space1
+      ws <- space -- Because of this
       query <- fromMaybe
         ((\x -> SubstitutionQuery x [Substitution "" x]) <$> word "<QUERY>")
         (HashMap.lookup type_ substitutions)
       pure ParsedQuery
         { parsedQuery = ws ++ searchedValue query
-        , parsedSubstitutions =
-          [ Substitution
-            { needle = pack (mconcat ["!", name, ".", needle s, "!"])
-            , replacement = pack $ replacement s
-            }
+        , parsedSubstitutions = mconcat
+          [ [ Substitution
+              { needle = pack (mconcat ["!", name, ".", needle s, "!"])
+              , replacement = pack $ replacement s
+              }
+            , Substitution
+              { needle = pack (mconcat ["!", name, ":", needle s, "!"])
+              , replacement = pack $ searchedValue query
+              }
+            ]
           | s <- replacements query
           ]
         }

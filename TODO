@@ -8,3 +8,5 @@
 8.) [done] Add proper parsers, so that you can have multiple word commands, and can use arbitrary prefixes of sommands (i,e, you could have search scala, but also any unique prefix, like s sc, or maybe even like ss).
 9.) Add connection to amazon alexa, or google voice assistant, and others?
 10.)[done]  Add ability to do completion (extend AmbiguousParser)
+11.) Config parser/validator or just use json / yaml or similar
+12.) Dockerize, publish through docker

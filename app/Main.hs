@@ -100,8 +100,8 @@ getRepoPaths Options{..} = fromMaybe []
 
 loadGitHub :: Options -> IO PC.SubstitutionQueries
 loadGitHub opts = do
-  -- TODO: barf on wrong decode
   repoPaths <- getRepoPaths opts
+  putStrLn (show repoPaths)
   repositories <- mapM extractRepoInfo repoPaths
   localBranches <- mconcat <$> mapM (extractBranches False) repoPaths
   remoteBranches <- mconcat <$> mapM (extractBranches True) repoPaths
