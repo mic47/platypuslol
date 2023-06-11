@@ -12,13 +12,30 @@ pub struct RegExEdge {
 
 #[derive(Clone, Debug)]
 pub struct Node<T> {
-    pub payload: Option<T>,
-    pub is_final: bool,
+    payload: Option<T>,
+    is_final: bool,
     normal_edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
     regex_edges: Vec<RegExEdge>,
 }
 
+impl<T> Default for Node<T> {
+    fn default() -> Self {
+        Node {
+            payload: Default::default(),
+            is_final: false,
+            normal_edges: Default::default(),
+            regex_edges: Default::default(),
+        }
+    }
+}
+
 impl<T> Node<T> {
+    pub fn with_payload_and_final(mut self, payload: T) -> Self {
+        self.payload = Some(payload);
+        self.is_final = true;
+        self
+    }
+
     fn map<R, F: Fn(&T) -> R>(&self, f: &F) -> Node<R> {
         Node {
             payload: match self.payload {
@@ -38,6 +55,23 @@ impl<T> Node<T> {
             .entry(value)
             .or_default()
             .push(index);
+    }
+
+    pub fn with_normal_edge(mut self, value: String, index: NodeIndex) -> Self {
+        self.add_normal_edge(value, index);
+        self
+    }
+
+    pub fn with_regex_edge(mut self, edge: RegExEdge) -> Self {
+        self.regex_edges.push(edge);
+        self
+    }
+
+    pub fn with_normal_edges(mut self, edges: &[(&str, NodeIndex)]) -> Self {
+        for (value, index) in edges.iter() {
+            self.add_normal_edge((*value).into(), *index);
+        }
+        self
     }
 
     pub fn get_matching_edges<'a>(&self, input: &'a str) -> Vec<(NodeIndex, &'a str)> {
@@ -167,12 +201,7 @@ impl<T: Clone> NFA<T> {
             return Self::nothing();
         }
         let mut ret = NFA {
-            nodes: vec![Node {
-                payload: None,
-                is_final: false,
-                normal_edges: HashMap::default(),
-                regex_edges: Default::default(),
-            }],
+            nodes: vec![Node::default()],
             root: 0,
         };
         let mut shift = ret.nodes.len();
@@ -192,112 +221,60 @@ impl<T: Clone> NFA<T> {
 impl NFA<()> {
     pub fn match_string(input: &str) -> NFA<()> {
         let nodes = vec![
-            Node {
-                payload: None,
-                is_final: false,
-                normal_edges: HashMap::from([(
-                    input.len(),
-                    HashMap::from([(input.into(), vec![1])]),
-                )]),
-                regex_edges: Default::default(),
-            },
-            Node {
-                payload: Some(()),
-                is_final: true,
-                normal_edges: HashMap::default(),
-                regex_edges: Default::default(),
-            },
+            Node::default().with_normal_edge(input.into(), 1),
+            Node::default().with_payload_and_final(()),
         ];
         NFA { nodes, root: 0 }
     }
 
     pub fn match_non_empty_prefixes(input: &str) -> NFA<()> {
         let nodes = vec![
-            Node {
-                payload: None,
-                is_final: false,
-                normal_edges: (1..input.len() + 1)
-                    .map(|len| (len, HashMap::from([(input[0..len].into(), vec![1])])))
-                    .collect(),
-                regex_edges: Default::default(),
-            },
-            Node {
-                payload: Some(()),
-                is_final: true,
-                normal_edges: HashMap::default(),
-                regex_edges: Default::default(),
-            },
+            Node::default().with_normal_edges(
+                &((1..input.len() + 1)
+                    .map(|len| (&input[0..len], 1))
+                    .collect::<Vec<_>>()),
+            ),
+            Node::default().with_payload_and_final(()),
         ];
         NFA { nodes, root: 0 }
     }
 
     pub fn match_zero_or_more_spaces() -> NFA<()> {
-        let nodes = vec![Node {
-            payload: Some(()),
-            is_final: true,
-            normal_edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![0])]))]),
-            regex_edges: Default::default(),
-        }];
+        let nodes = vec![Node::default()
+            .with_payload_and_final(())
+            .with_normal_edge(" ".into(), 0)];
         NFA { nodes, root: 0 }
     }
 
     pub fn match_one_or_more_spaces() -> NFA<()> {
         let nodes = vec![
-            Node {
-                payload: None,
-                is_final: false,
-                normal_edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
-                regex_edges: Default::default(),
-            },
-            Node {
-                payload: Some(()),
-                is_final: true,
-                normal_edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
-                regex_edges: Default::default(),
-            },
+            Node::default().with_normal_edge(" ".into(), 1),
+            Node::default()
+                .with_payload_and_final(())
+                .with_normal_edge(" ".into(), 1),
         ];
         NFA { nodes, root: 0 }
     }
 
     pub fn rest_of_string(x: String) -> NFA<()> {
         let nodes = vec![
-            Node {
-                payload: None,
-                is_final: false,
-                normal_edges: Default::default(),
-                regex_edges: vec![RegExEdge {
-                    expression: regex::Regex::new(r"\w+").unwrap(), // TODO: remove unwrap
-                    suggestion: "<QUERY>".into(),
-                    target: vec![1],
-                }],
-            },
-            Node {
-                payload: Some(()),
-                is_final: true,
-                normal_edges: Default::default(),
-                regex_edges: Default::default(),
-            },
+            Node::default().with_regex_edge(RegExEdge {
+                expression: regex::Regex::new(r"\w+").unwrap(), // TODO: remove unwrap
+                suggestion: "<QUERY>".into(),
+                target: vec![1],
+            }),
+            Node::default().with_payload_and_final(()),
         ];
         NFA { nodes, root: 0 }
     }
     pub fn word(x: String) -> NFA<()> {
         let nodes = vec![
-            Node {
-                payload: None,
-                is_final: false,
-                normal_edges: Default::default(),
-                regex_edges: vec![RegExEdge {
-                    expression: regex::Regex::new(r".+").unwrap(), // TODO: remove unwrap
-                    suggestion: "<WORD>".into(),
-                    target: vec![1],
-                }],
-            },
-            Node {
-                payload: Some(()),
-                is_final: true,
-                normal_edges: Default::default(),
-                regex_edges: Default::default(),
-            },
+            Node::default().with_regex_edge(RegExEdge {
+                expression: regex::Regex::new(r".+").unwrap(), // TODO: remove unwrap
+                suggestion: "<WORD>".into(),
+                target: vec![1],
+            }),
+            Node::default().with_payload_and_final(()),
         ];
         NFA { nodes, root: 0 }
     }
@@ -306,12 +283,7 @@ impl NFA<()> {
 impl<T> NFA<T> {
     pub fn nothing() -> NFA<T> {
         NFA {
-            nodes: vec![Node {
-                payload: None,
-                is_final: false,
-                normal_edges: HashMap::default(),
-                regex_edges: Default::default(),
-            }],
+            nodes: vec![Node::default()],
             root: 0,
         }
     }
@@ -344,7 +316,7 @@ impl<T: std::fmt::Debug> NFA<T> {
     // TODO: need 2 features
     // - [ ] Way to propagate captures in regex queries. Maybe something more general.
     // - [ ] Way to aggregate state / captures while searching.
-    //       Probably something like edge can emit capture, and final node can get these. 
+    //       Probably something like edge can emit capture, and final node can get these.
     //       So trace can be like
     //       NodePayload(xxx), EdgePayload(xxx), NodePayload(xxx), NodePayload(xxx).
     pub fn parse_full_and_suggest<'a, 'b>(
