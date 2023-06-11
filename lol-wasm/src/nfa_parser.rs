@@ -4,10 +4,18 @@ type Length = usize;
 type NodeIndex = usize;
 
 #[derive(Clone, Debug)]
+pub struct RegExEdge {
+    expression: regex::Regex,
+    suggestion: String,
+    target: Vec<NodeIndex>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Node<T> {
     pub payload: Option<T>,
     pub is_final: bool,
-    edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
+    normal_edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
+    regex_edges: Vec<RegExEdge>,
 }
 
 impl<T> Node<T> {
@@ -18,12 +26,13 @@ impl<T> Node<T> {
                 None => None,
             },
             is_final: self.is_final,
-            edges: self.edges.clone(),
+            normal_edges: self.normal_edges.clone(),
+            regex_edges: self.regex_edges.clone(),
         }
     }
 
-    pub fn add_edge(&mut self, value: String, index: NodeIndex) {
-        self.edges
+    pub fn add_normal_edge(&mut self, value: String, index: NodeIndex) {
+        self.normal_edges
             .entry(value.len())
             .or_default()
             .entry(value)
@@ -33,7 +42,8 @@ impl<T> Node<T> {
 
     pub fn get_matching_edges<'a>(&self, input: &'a str) -> Vec<(NodeIndex, &'a str)> {
         let length = input.len();
-        self.edges
+        let normal_edges = self
+            .normal_edges
             .iter()
             .filter(|(len, _)| len <= &&length)
             .flat_map(|(len, hm)| {
@@ -43,12 +53,34 @@ impl<T> Node<T> {
                 } else {
                     vec![]
                 }
+            });
+        let regex_edges = self
+            .regex_edges
+            .iter()
+            .filter_map(|x| {
+                if let Some(re_match) = x.expression.find(input) {
+                    if re_match.start() > 0 {
+                        None
+                    } else {
+                        let rest = &input[re_match.end()..];
+                        let mut out = vec![];
+                        for target_node in x.target.iter() {
+                            out.push((*target_node, rest))
+                        }
+                        Some(out)
+                    }
+                } else {
+                    None
+                }
             })
-            .collect()
+            .flatten();
+        normal_edges.chain(regex_edges).collect()
     }
 
     pub fn get_suggestions<'a>(&'a self) -> Vec<(&'a String, &'a Vec<NodeIndex>)> {
-        self.edges.values().flat_map(|x| x.iter()).collect()
+        let normal_edges = self.normal_edges.values().flat_map(|x| x.iter());
+        let regex_edges = self.regex_edges.iter().map(|x| (&x.suggestion, &x.target));
+        normal_edges.chain(regex_edges).collect()
     }
 }
 
@@ -57,8 +89,8 @@ impl<T: Clone> Node<T> {
         Node {
             payload: self.payload.clone(),
             is_final: self.is_final,
-            edges: self
-                .edges
+            normal_edges: self
+                .normal_edges
                 .iter()
                 .map(|(k, v)| {
                     (
@@ -67,6 +99,15 @@ impl<T: Clone> Node<T> {
                             .map(|(k, v)| (k.clone(), v.iter().map(|x| x + shift).collect()))
                             .collect(),
                     )
+                })
+                .collect(),
+            regex_edges: self
+                .regex_edges
+                .iter()
+                .map(|x| RegExEdge {
+                    expression: x.expression.clone(),
+                    suggestion: x.suggestion.clone(),
+                    target: x.target.iter().map(|x| x + shift).collect(),
                 })
                 .collect(),
         }
@@ -106,7 +147,7 @@ impl<T: Clone> NFA<T> {
             let root = shift + nfa.root;
             leafs.iter().for_each(|index| {
                 ret.nodes[*index].is_final = false;
-                ret.nodes[*index].add_edge("".into(), root);
+                ret.nodes[*index].add_normal_edge("".into(), root);
             });
             leafs.clear();
             for node in nfa.nodes.iter() {
@@ -129,14 +170,15 @@ impl<T: Clone> NFA<T> {
             nodes: vec![Node {
                 payload: None,
                 is_final: false,
-                edges: HashMap::default(),
+                normal_edges: HashMap::default(),
+                regex_edges: Default::default(),
             }],
             root: 0,
         };
         let mut shift = ret.nodes.len();
         for nfa in nfas.into_iter() {
             let root = shift + nfa.root;
-            ret.nodes[0].add_edge("".into(), root);
+            ret.nodes[0].add_normal_edge("".into(), root);
             for node in nfa.nodes.iter() {
                 let node = node.shift(shift);
                 ret.nodes.push(node);
@@ -153,12 +195,17 @@ impl NFA<()> {
             Node {
                 payload: None,
                 is_final: false,
-                edges: HashMap::from([(input.len(), HashMap::from([(input.into(), vec![1])]))]),
+                normal_edges: HashMap::from([(
+                    input.len(),
+                    HashMap::from([(input.into(), vec![1])]),
+                )]),
+                regex_edges: Default::default(),
             },
             Node {
                 payload: Some(()),
                 is_final: true,
-                edges: HashMap::default(),
+                normal_edges: HashMap::default(),
+                regex_edges: Default::default(),
             },
         ];
         NFA { nodes, root: 0 }
@@ -169,14 +216,16 @@ impl NFA<()> {
             Node {
                 payload: None,
                 is_final: false,
-                edges: (1..input.len() + 1)
+                normal_edges: (1..input.len() + 1)
                     .map(|len| (len, HashMap::from([(input[0..len].into(), vec![1])])))
                     .collect(),
+                regex_edges: Default::default(),
             },
             Node {
                 payload: Some(()),
                 is_final: true,
-                edges: HashMap::default(),
+                normal_edges: HashMap::default(),
+                regex_edges: Default::default(),
             },
         ];
         NFA { nodes, root: 0 }
@@ -186,7 +235,8 @@ impl NFA<()> {
         let nodes = vec![Node {
             payload: Some(()),
             is_final: true,
-            edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![0])]))]),
+            normal_edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![0])]))]),
+            regex_edges: Default::default(),
         }];
         NFA { nodes, root: 0 }
     }
@@ -196,12 +246,14 @@ impl NFA<()> {
             Node {
                 payload: None,
                 is_final: false,
-                edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
+                normal_edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
+                regex_edges: Default::default(),
             },
             Node {
                 payload: Some(()),
                 is_final: true,
-                edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
+                normal_edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
+                regex_edges: Default::default(),
             },
         ];
         NFA { nodes, root: 0 }
@@ -221,7 +273,8 @@ impl<T> NFA<T> {
             nodes: vec![Node {
                 payload: None,
                 is_final: false,
-                edges: HashMap::default(),
+                normal_edges: HashMap::default(),
+                regex_edges: Default::default(),
             }],
             root: 0,
         }
