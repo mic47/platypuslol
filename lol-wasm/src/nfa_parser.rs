@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 type Length = usize;
 type NodeIndex = usize;
@@ -7,7 +7,7 @@ type NodeIndex = usize;
 pub struct Node<T> {
     pub payload: Option<T>,
     pub is_final: bool,
-    pub edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
+    edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
 }
 
 impl<T> Node<T> {
@@ -20,6 +20,35 @@ impl<T> Node<T> {
             is_final: self.is_final,
             edges: self.edges.clone(),
         }
+    }
+
+    pub fn add_edge(&mut self, value: String, index: NodeIndex) {
+        self.edges
+            .entry(value.len())
+            .or_default()
+            .entry(value)
+            .or_default()
+            .push(index);
+    }
+
+    pub fn get_matching_edges<'a>(&self, input: &'a str) -> Vec<(NodeIndex, &'a str)> {
+        let length = input.len();
+        self.edges
+            .iter()
+            .filter(|(len, _)| len <= &&length)
+            .flat_map(|(len, hm)| {
+                if let Some(edges) = hm.get(&input[..*len]) {
+                    let rest = input.split_at(*len).1;
+                    edges.into_iter().map(|index| (*index, rest)).collect()
+                } else {
+                    vec![]
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_suggestions<'a>(&'a self) -> Vec<(&'a String, &'a Vec<NodeIndex>)> {
+        self.edges.values().flat_map(|x| x.iter()).collect()
     }
 }
 
@@ -77,13 +106,7 @@ impl<T: Clone> NFA<T> {
             let root = shift + nfa.root;
             leafs.iter().for_each(|index| {
                 ret.nodes[*index].is_final = false;
-                ret.nodes[*index]
-                    .edges
-                    .entry(0)
-                    .or_default()
-                    .entry("".into())
-                    .or_default()
-                    .push(root);
+                ret.nodes[*index].add_edge("".into(), root);
             });
             leafs.clear();
             for node in nfa.nodes.iter() {
@@ -113,13 +136,7 @@ impl<T: Clone> NFA<T> {
         let mut shift = ret.nodes.len();
         for nfa in nfas.into_iter() {
             let root = shift + nfa.root;
-            ret.nodes[0]
-                .edges
-                .entry(0)
-                .or_default()
-                .entry("".into())
-                .or_default()
-                .push(root);
+            ret.nodes[0].add_edge("".into(), root);
             for node in nfa.nodes.iter() {
                 let node = node.shift(shift);
                 ret.nodes.push(node);
@@ -215,22 +232,10 @@ impl<T> NFA<T> {
         node_self: &Node<T>,
         input: &'b str,
     ) -> Vec<(&'a Node<T>, &'b str)> {
-        let length = input.len();
         node_self
-            .edges
-            .iter()
-            .filter(|(len, _)| len <= &&length)
-            .flat_map(|(len, hm)| {
-                if let Some(edges) = hm.get(&input[..*len]) {
-                    let rest = input.split_at(*len).1;
-                    edges
-                        .into_iter()
-                        .map(|index| (&self.nodes[*index], rest))
-                        .collect()
-                } else {
-                    vec![]
-                }
-            })
+            .get_matching_edges(input)
+            .into_iter()
+            .map(|(index, rest)| (&self.nodes[index], rest))
             .collect()
     }
 }
@@ -247,7 +252,10 @@ impl<T: std::fmt::Debug> NFA<T> {
             .collect()
     }
 
-    pub fn parse_full_and_suggest<'a, 'b>(&'a self, input: &'b str) -> (Vec<(&'a T, &'b str)>, Vec<(String, &'a Option<T>)>) {
+    pub fn parse_full_and_suggest<'a, 'b>(
+        &'a self,
+        input: &'b str,
+    ) -> (Vec<(&'a T, &'b str)>, Vec<(String, &'a Option<T>)>) {
         // TODO: collect payloads
         //println!("self: {:#?}", self);
         let mut state = VecDeque::from([(&self.nodes[self.root], input)]);
@@ -277,19 +285,19 @@ impl<T: std::fmt::Debug> NFA<T> {
             if node.is_final {
                 suggestions.push((format!("{}{}", input, suggestion.join("")), &node.payload))
             }
-            for (text, target_nodes) in node.edges.values().flat_map(|x| x.iter()) {
+            for (text, target_nodes) in node.get_suggestions() {
                 for target_node in target_nodes.iter().filter(|x| visited.insert(**x)) {
                     let mut suggestion = suggestion.clone();
                     suggestion.push(text);
-                    suggestion_states.push_back((
-                        &self.nodes[*target_node],
-                        suggestion,
-                    ))
+                    suggestion_states.push_back((&self.nodes[*target_node], suggestion))
                 }
             }
         }
 
-        (output.into_iter().filter(|x| x.1.is_empty()).collect(), suggestions)
+        (
+            output.into_iter().filter(|x| x.1.is_empty()).collect(),
+            suggestions,
+        )
     }
 }
 
