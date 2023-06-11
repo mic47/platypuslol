@@ -1,5 +1,9 @@
 mod ambiguous_parser;
+mod query_dsl;
+mod nfa_parser;
 pub use ambiguous_parser::*;
+pub use query_dsl::*;
+pub use nfa_parser::*;
 
 use wasm_bindgen::prelude::*;
 
