@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque, HashSet};
 
 type Length = usize;
 type NodeIndex = usize;
@@ -8,6 +8,19 @@ pub struct Node<T> {
     pub payload: Option<T>,
     pub is_final: bool,
     pub edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
+}
+
+impl<T> Node<T> {
+    fn map<R, F: Fn(&T) -> R>(&self, f: &F) -> Node<R> {
+        Node {
+            payload: match self.payload {
+                Some(ref p) => Some(f(p)),
+                None => None,
+            },
+            is_final: self.is_final,
+            edges: self.edges.clone(),
+        }
+    }
 }
 
 impl<T: Clone> Node<T> {
@@ -35,6 +48,15 @@ impl<T: Clone> Node<T> {
 pub struct NFA<T> {
     nodes: Vec<Node<T>>,
     pub root: NodeIndex,
+}
+
+impl<T> NFA<T> {
+    pub fn map<R, F: Fn(&T) -> R>(&self, f: &F) -> NFA<R> {
+        NFA {
+            nodes: self.nodes.iter().map(|x| x.map(f)).collect(),
+            root: self.root,
+        }
+    }
 }
 
 impl<T: Clone> NFA<T> {
@@ -167,6 +189,13 @@ impl NFA<()> {
         ];
         NFA { nodes, root: 0 }
     }
+
+    pub fn rest_of_string(x: String) -> NFA<()> {
+        Self::nothing()
+    }
+    pub fn word(x: String) -> NFA<()> {
+        Self::nothing()
+    }
 }
 
 impl<T> NFA<T> {
@@ -206,7 +235,7 @@ impl<T> NFA<T> {
     }
 }
 
-trait Parser<T> {
+pub trait Parser<T> {
     fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)>;
 }
 
@@ -217,19 +246,64 @@ impl<T: std::fmt::Debug> NFA<T> {
             .filter_map(|x| if x.1.is_empty() { Some(x.0) } else { None })
             .collect()
     }
+
+    pub fn parse_full_and_suggest<'a, 'b>(&'a self, input: &'b str) -> (Vec<(&'a T, &'b str)>, Vec<(String, &'a Option<T>)>) {
+        // TODO: collect payloads
+        //println!("self: {:#?}", self);
+        let mut state = VecDeque::from([(&self.nodes[self.root], input)]);
+        //println!("state: {:#?}", state);
+        let mut output = vec![];
+        let mut suggestion_states: VecDeque<(_, Vec<&str>)> = VecDeque::from([]);
+        while let Some((node, string)) = state.pop_front() {
+            //println!("state: {:#?}, node: {:#?}, string: {}", state, node, string);
+            if string.is_empty() {
+                suggestion_states.push_back((node, vec![]))
+            }
+            if node.is_final {
+                if let Some(ref payload) = node.payload {
+                    output.push((payload, string));
+                } else {
+                    // TODO: what is it's missing, or have value and not final...
+                }
+            }
+            state.extend(self.node_parse(node, string));
+        }
+        // BFS for finding suggestions
+        // TODO: suggestions are ugly here, i.e. for shortcuts, we would like to have something
+        // else for suggestions.
+        let mut suggestions = vec![];
+        let mut visited: HashSet<NodeIndex> = Default::default();
+        while let Some((node, suggestion)) = suggestion_states.pop_front() {
+            if node.is_final {
+                suggestions.push((format!("{}{}", input, suggestion.join("")), &node.payload))
+            }
+            for (text, target_nodes) in node.edges.values().flat_map(|x| x.iter()) {
+                for target_node in target_nodes.iter().filter(|x| visited.insert(**x)) {
+                    let mut suggestion = suggestion.clone();
+                    suggestion.push(text);
+                    suggestion_states.push_back((
+                        &self.nodes[*target_node],
+                        suggestion,
+                    ))
+                }
+            }
+        }
+
+        (output.into_iter().filter(|x| x.1.is_empty()).collect(), suggestions)
+    }
 }
 
 impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
     fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)> {
         // TODO: collect payloads
-        println!("self: {:#?}", self);
+        //println!("self: {:#?}", self);
         let mut state = VecDeque::from([(&self.nodes[self.root], input)]);
-        println!("state: {:#?}", state);
+        //println!("state: {:#?}", state);
         let mut output = vec![];
         while let Some((node, string)) = state.pop_front() {
-            println!("state: {:#?}, node: {:#?}, string: {}", state, node, string);
+            //println!("state: {:#?}, node: {:#?}, string: {}", state, node, string);
             if node.is_final {
-                if let Some(ref payload) = node.payload{
+                if let Some(ref payload) = node.payload {
                     output.push((payload, string));
                 } else {
                     // TODO: what is it's missing, or have value and not final...

@@ -1,8 +1,6 @@
-use lol_wasm::{AmbiguousParser, DslWord};
+use lol_wasm::{DslWord, NFA};
 
-use std::{path::PathBuf, sync::Arc};
-
-use clap::Parser;
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,11 +11,11 @@ pub struct ConfigLinkQuery {
 }
 
 pub struct Query {
-    pub parser: AmbiguousParser<String>,
+    pub parser: NFA<String>,
     pub source: ConfigLinkQuery,
 }
 
-#[derive(Parser)]
+#[derive(clap::Parser)]
 struct Cli {
     #[arg(short, long, value_name = "FILE")]
     pub link_config: PathBuf,
@@ -32,11 +30,11 @@ pub fn main() {
     // - [ ] Construct basic parser
     // - [ ] Construct more advanced parser (actually use the DSL)
     // - [ ] Add substitutions
-    let cli = Cli::parse();
+    let cli = <Cli as clap::Parser>::parse();
     let config: Vec<ConfigLinkQuery> =
         serde_json::from_str(&std::fs::read_to_string(cli.link_config).unwrap()).unwrap();
-    let parser = AmbiguousParser::any_of(
-        config
+    let parser = NFA::any_of(
+        &(config
             .into_iter()
             // TODO: replace screw up suggestions
             .map(|c| {
@@ -47,44 +45,39 @@ pub fn main() {
                     if let Some(prev) = prev {
                         match word {
                             DslWord::QueryString(_) => {
-                                parsers.push(AmbiguousParser::at_least_one_space())
+                                parsers.push(NFA::match_one_or_more_spaces())
                             }
-                            DslWord::Query(_) => {
-                                parsers.push(AmbiguousParser::at_least_one_space())
-                            }
+                            DslWord::Query(_) => parsers.push(NFA::match_one_or_more_spaces()),
                             DslWord::SubstitutionQuery(_) => (),
                             _ => match prev {
                                 DslWord::QueryString(_) => {
-                                    parsers.push(AmbiguousParser::at_least_one_space())
+                                    parsers.push(NFA::match_one_or_more_spaces())
                                 }
-                                DslWord::Query(_) => {
-                                    parsers.push(AmbiguousParser::at_least_one_space())
-                                }
+                                DslWord::Query(_) => parsers.push(NFA::match_one_or_more_spaces()),
                                 DslWord::SubstitutionQuery(_) => {
-                                    parsers.push(AmbiguousParser::at_least_one_space())
+                                    parsers.push(NFA::match_one_or_more_spaces())
                                 }
-                                _ => parsers.push(AmbiguousParser::at_least_zero_space()),
+                                _ => parsers.push(NFA::match_zero_or_more_spaces()),
                             },
                         }
                     }
                     parsers.push(match word {
-                        DslWord::Prefix(ref word) => AmbiguousParser::non_empty_prefixes(&word),
-                        DslWord::Optional(ref word) => AmbiguousParser::any_of(vec![
-                            AmbiguousParser::string(&word),
-                            AmbiguousParser::empty("".into()),
-                        ]),
+                        DslWord::Prefix(ref word) => NFA::match_non_empty_prefixes(&word),
+                        DslWord::Optional(ref word) => {
+                            NFA::any_of(&[NFA::match_string(&word), NFA::match_string("")])
+                        }
                         // eat everything
-                        DslWord::QueryString(ref word) => AmbiguousParser::rest_of_string("<QUERY>".into()),
+                        DslWord::QueryString(ref word) => NFA::rest_of_string("<QUERY>".into()),
                         // Single word
-                        DslWord::Query(ref word) => AmbiguousParser::word("<WORD>".into()),
+                        DslWord::Query(ref word) => NFA::word("<WORD>".into()),
                         DslWord::SubstitutionQuery(_) => todo!(),
                     });
                     prev = Some(word)
                 }
-                AmbiguousParser::chain(parsers).map(Arc::new(move |x| (x, c.clone())))
+                NFA::chain(&parsers).map(&move |x| (x.clone(), c.clone()))
             })
-            .collect(),
+            .collect::<Vec<_>>()),
     );
-    let output = parser.parse_then_suggest(&cli.query);
+    let output = parser.parse_full_and_suggest(&cli.query);
     println!("{:#?}", output);
 }
