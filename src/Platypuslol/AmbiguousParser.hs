@@ -3,6 +3,7 @@ module Platypuslol.AmbiguousParser
   , parseAll
   , suggestAll
   , parseThenSuggest
+  , parseAndSuggest
   , setSuggestion
   , subsequenceWord
   , predicateWord
@@ -87,6 +88,16 @@ parseThenSuggest (AmbiguousParser p) =
   . p
   where
     toList (l, r) = r ++ l
+
+parseAndSuggest :: AmbiguousParser a -> String -> ([a], [a])
+parseAndSuggest (AmbiguousParser p) =
+  partitionParserResult
+  . map fst
+  . filter ((""==) . snd)
+  . p
+  where
+    toList (l, r) = r ++ l
+
 
 
 suggestAll :: AmbiguousParser a -> String -> [a]
