@@ -5,14 +5,16 @@ type NodeIndex = usize;
 
 #[derive(Clone, Debug)]
 pub struct Node<T> {
-    pub value: Option<T>,
-    edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
+    pub payload: Option<T>,
+    pub is_final: bool,
+    pub edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
 }
 
 impl<T: Clone> Node<T> {
     fn shift(&self, shift: usize) -> Self {
         Node {
-            value: self.value.clone(),
+            payload: self.payload.clone(),
+            is_final: self.is_final,
             edges: self
                 .edges
                 .iter()
@@ -45,15 +47,14 @@ impl<T: Clone> NFA<T> {
             .nodes
             .iter()
             .enumerate()
-            .filter(|x| x.1.value.is_some())
+            .filter(|x| x.1.is_final)
             .map(|x| x.0)
             .collect::<Vec<_>>();
         let mut shift = ret.nodes.len();
         for nfa in nfas[1..].into_iter() {
             let root = shift + nfa.root;
             leafs.iter().for_each(|index| {
-                // TODO: we are loosing this
-                ret.nodes[*index].value = None;
+                ret.nodes[*index].is_final = false;
                 ret.nodes[*index]
                     .edges
                     .entry(0)
@@ -65,7 +66,7 @@ impl<T: Clone> NFA<T> {
             leafs.clear();
             for node in nfa.nodes.iter() {
                 let node = node.shift(shift);
-                if node.value.is_some() {
+                if node.is_final {
                     leafs.push(ret.nodes.len());
                 }
                 ret.nodes.push(node);
@@ -81,7 +82,8 @@ impl<T: Clone> NFA<T> {
         }
         let mut ret = NFA {
             nodes: vec![Node {
-                value: None,
+                payload: None,
+                is_final: false,
                 edges: HashMap::default(),
             }],
             root: 0,
@@ -110,11 +112,13 @@ impl NFA<()> {
     pub fn match_string(input: &str) -> NFA<()> {
         let nodes = vec![
             Node {
-                value: None,
+                payload: None,
+                is_final: false,
                 edges: HashMap::from([(input.len(), HashMap::from([(input.into(), vec![1])]))]),
             },
             Node {
-                value: Some(()),
+                payload: Some(()),
+                is_final: true,
                 edges: HashMap::default(),
             },
         ];
@@ -124,13 +128,15 @@ impl NFA<()> {
     pub fn match_non_empty_prefixes(input: &str) -> NFA<()> {
         let nodes = vec![
             Node {
-                value: None,
+                payload: None,
+                is_final: false,
                 edges: (1..input.len() + 1)
                     .map(|len| (len, HashMap::from([(input[0..len].into(), vec![1])])))
                     .collect(),
             },
             Node {
-                value: Some(()),
+                payload: Some(()),
+                is_final: true,
                 edges: HashMap::default(),
             },
         ];
@@ -139,7 +145,8 @@ impl NFA<()> {
 
     pub fn match_zero_or_more_spaces() -> NFA<()> {
         let nodes = vec![Node {
-            value: Some(()),
+            payload: Some(()),
+            is_final: true,
             edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![0])]))]),
         }];
         NFA { nodes, root: 0 }
@@ -148,11 +155,13 @@ impl NFA<()> {
     pub fn match_one_or_more_spaces() -> NFA<()> {
         let nodes = vec![
             Node {
-                value: None,
+                payload: None,
+                is_final: false,
                 edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
             },
             Node {
-                value: Some(()),
+                payload: Some(()),
+                is_final: true,
                 edges: HashMap::from([(1, HashMap::from([(" ".into(), vec![1])]))]),
             },
         ];
@@ -164,7 +173,8 @@ impl<T> NFA<T> {
     pub fn nothing() -> NFA<T> {
         NFA {
             nodes: vec![Node {
-                value: None,
+                payload: None,
+                is_final: false,
                 edges: HashMap::default(),
             }],
             root: 0,
@@ -211,14 +221,19 @@ impl<T: std::fmt::Debug> NFA<T> {
 
 impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
     fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)> {
+        // TODO: collect payloads
         println!("self: {:#?}", self);
         let mut state = VecDeque::from([(&self.nodes[self.root], input)]);
         println!("state: {:#?}", state);
         let mut output = vec![];
         while let Some((node, string)) = state.pop_front() {
             println!("state: {:#?}, node: {:#?}, string: {}", state, node, string);
-            if let Some(ref value) = node.value {
-                output.push((value, string));
+            if node.is_final {
+                if let Some(ref payload) = node.payload{
+                    output.push((payload, string));
+                } else {
+                    // TODO: what is it's missing, or have value and not final...
+                }
             }
             state.extend(self.node_parse(node, string));
         }
@@ -308,7 +323,6 @@ fn test_chain_3_elements_with_zero_space() {
     assert_eq!(parser.parse("foo b_extra"), vec![(&(), "_extra")]);
     assert_eq!(parser.parse("foob_extra"), vec![(&(), "_extra")]);
 }
-
 
 #[test]
 fn test_any_of() {
