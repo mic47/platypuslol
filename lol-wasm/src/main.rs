@@ -68,9 +68,9 @@ pub fn main() {
                         }
                         // TODO: remove these, and have general regex in the DSL
                         // eat everything
-                        DslWord::QueryString(ref word) => NFA::rest_of_string("<QUERY>".into()),
+                        DslWord::QueryString(ref word) => NFA::rest_of_string(word.clone()),
                         // Single word
-                        DslWord::Query(ref word) => NFA::word("<WORD>".into()),
+                        DslWord::Query(ref word) => NFA::word(word.clone()),
                         DslWord::SubstitutionQuery(_) => todo!(),
                     });
                     prev = Some(word)
@@ -79,6 +79,11 @@ pub fn main() {
             })
             .collect::<Vec<_>>()),
     );
-    let output = parser.parse_full_and_suggest(&cli.query);
-    println!("{:#?}", output);
+    let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
+    for p in parsed.into_iter() {
+        println!("{:#?}", p);
+    }
+    for s in suggested.into_iter() {
+        println!("{:#?}", s);
+    }
 }

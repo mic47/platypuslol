@@ -4,10 +4,23 @@ type Length = usize;
 type NodeIndex = usize;
 
 #[derive(Clone, Debug)]
+pub struct WithIdentifier<T> {
+    pub identifier: String,
+    pub payload: T,
+}
+
+#[derive(Clone, Debug)]
+pub enum Trace<T> {
+    Edge(WithIdentifier<String>),
+    Node(T),
+}
+
+#[derive(Clone, Debug)]
 pub struct RegExEdge {
     expression: regex::Regex,
     suggestion: String,
     target: Vec<NodeIndex>,
+    identifier: String,
 }
 
 #[derive(Clone, Debug)]
@@ -74,7 +87,10 @@ impl<T> Node<T> {
         self
     }
 
-    pub fn get_matching_edges<'a>(&self, input: &'a str) -> Vec<(NodeIndex, &'a str)> {
+    pub fn get_matching_edges<'a>(
+        &self,
+        input: &'a str,
+    ) -> Vec<(NodeIndex, &'a str, Option<WithIdentifier<String>>)> {
         let length = input.len();
         let normal_edges = self
             .normal_edges
@@ -83,7 +99,10 @@ impl<T> Node<T> {
             .flat_map(|(len, hm)| {
                 if let Some(edges) = hm.get(&input[..*len]) {
                     let rest = input.split_at(*len).1;
-                    edges.into_iter().map(|index| (*index, rest)).collect()
+                    edges
+                        .into_iter()
+                        .map(|index| (*index, rest, None))
+                        .collect()
                 } else {
                     vec![]
                 }
@@ -99,7 +118,14 @@ impl<T> Node<T> {
                         let rest = &input[re_match.end()..];
                         let mut out = vec![];
                         for target_node in x.target.iter() {
-                            out.push((*target_node, rest))
+                            out.push((
+                                *target_node,
+                                rest,
+                                Some(WithIdentifier {
+                                    identifier: x.identifier.clone(),
+                                    payload: re_match.as_str().into(),
+                                }),
+                            ));
                         }
                         Some(out)
                     }
@@ -142,6 +168,7 @@ impl<T: Clone> Node<T> {
                     expression: x.expression.clone(),
                     suggestion: x.suggestion.clone(),
                     target: x.target.iter().map(|x| x + shift).collect(),
+                    identifier: x.identifier.clone(),
                 })
                 .collect(),
         }
@@ -256,23 +283,25 @@ impl NFA<()> {
         NFA { nodes, root: 0 }
     }
 
-    pub fn rest_of_string(x: String) -> NFA<()> {
+    pub fn rest_of_string(identifier: String) -> NFA<()> {
         let nodes = vec![
             Node::default().with_regex_edge(RegExEdge {
-                expression: regex::Regex::new(r"\w+").unwrap(), // TODO: remove unwrap
+                expression: regex::Regex::new(r".+").unwrap(), // TODO: remove unwrap
                 suggestion: "<QUERY>".into(),
                 target: vec![1],
+                identifier,
             }),
             Node::default().with_payload_and_final(()),
         ];
         NFA { nodes, root: 0 }
     }
-    pub fn word(x: String) -> NFA<()> {
+    pub fn word(identifier: String) -> NFA<()> {
         let nodes = vec![
             Node::default().with_regex_edge(RegExEdge {
-                expression: regex::Regex::new(r".+").unwrap(), // TODO: remove unwrap
+                expression: regex::Regex::new(r"\w+").unwrap(), // TODO: remove unwrap
                 suggestion: "<WORD>".into(),
                 target: vec![1],
+                identifier,
             }),
             Node::default().with_payload_and_final(()),
         ];
@@ -292,17 +321,29 @@ impl<T> NFA<T> {
         &'a self,
         node_self: &Node<T>,
         input: &'b str,
-    ) -> Vec<(&'a Node<T>, &'b str)> {
+    ) -> Vec<(&'a Node<T>, &'b str, Option<WithIdentifier<String>>)> {
         node_self
             .get_matching_edges(input)
             .into_iter()
-            .map(|(index, rest)| (&self.nodes[index], rest))
+            .map(|(index, rest, edge_payload)| (&self.nodes[index], rest, edge_payload))
             .collect()
     }
 }
 
 pub trait Parser<T> {
     fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)>;
+}
+
+#[derive(Clone, Debug)]
+pub struct Parsed<'a, T> {
+    pub payload: &'a T,
+    pub trace: Vec<Trace<&'a T>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Suggestion<'a, T> {
+    pub payload: &'a Option<T>,
+    pub suggestion: String,
 }
 
 impl<T: std::fmt::Debug> NFA<T> {
@@ -313,35 +354,37 @@ impl<T: std::fmt::Debug> NFA<T> {
             .collect()
     }
 
-    // TODO: need 2 features
-    // - [ ] Way to propagate captures in regex queries. Maybe something more general.
-    // - [ ] Way to aggregate state / captures while searching.
-    //       Probably something like edge can emit capture, and final node can get these.
-    //       So trace can be like
-    //       NodePayload(xxx), EdgePayload(xxx), NodePayload(xxx), NodePayload(xxx).
     pub fn parse_full_and_suggest<'a, 'b>(
         &'a self,
         input: &'b str,
-    ) -> (Vec<(&'a T, &'b str)>, Vec<(String, &'a Option<T>)>) {
+    ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
         // TODO: collect payloads
-        //println!("self: {:#?}", self);
-        let mut state = VecDeque::from([(&self.nodes[self.root], input)]);
-        //println!("state: {:#?}", state);
+        let mut state = VecDeque::from([(&self.nodes[self.root], input, vec![])]);
         let mut output = vec![];
         let mut suggestion_states: VecDeque<(_, Vec<&str>)> = VecDeque::from([]);
-        while let Some((node, string)) = state.pop_front() {
-            //println!("state: {:#?}, node: {:#?}, string: {}", state, node, string);
+        while let Some((node, string, mut payloads)) = state.pop_front() {
             if string.is_empty() {
                 suggestion_states.push_back((node, vec![]))
             }
+            if let Some(ref payload) = node.payload {
+                payloads.push(Trace::Node(payload));
+            }
             if node.is_final {
                 if let Some(ref payload) = node.payload {
-                    output.push((payload, string));
+                    output.push((payload, string, payloads.clone()));
                 } else {
                     // TODO: what is it's missing, or have value and not final...
                 }
             }
-            state.extend(self.node_parse(node, string));
+            state.extend(self.node_parse(node, string).into_iter().map(
+                |(node, rest, edge_payload)| {
+                    let mut payloads = payloads.clone();
+                    if let Some(edge_payload) = edge_payload {
+                        payloads.push(Trace::Edge(edge_payload));
+                    }
+                    (node, rest, payloads)
+                },
+            ));
         }
         // BFS for finding suggestions
         // TODO: suggestions are ugly here, i.e. for shortcuts, we would like to have something
@@ -350,7 +393,10 @@ impl<T: std::fmt::Debug> NFA<T> {
         let mut visited: HashSet<NodeIndex> = Default::default();
         while let Some((node, suggestion)) = suggestion_states.pop_front() {
             if node.is_final {
-                suggestions.push((format!("{}{}", input, suggestion.join("")), &node.payload))
+                suggestions.push(Suggestion {
+                    suggestion: format!("{}{}", input, suggestion.join("")),
+                    payload: &node.payload,
+                })
             }
             for (text, target_nodes) in node.get_suggestions() {
                 for target_node in target_nodes.iter().filter(|x| visited.insert(**x)) {
@@ -362,7 +408,19 @@ impl<T: std::fmt::Debug> NFA<T> {
         }
 
         (
-            output.into_iter().filter(|x| x.1.is_empty()).collect(),
+            output
+                .into_iter()
+                .filter_map(|x| {
+                    if x.1.is_empty() {
+                        Some(Parsed {
+                            payload: x.0,
+                            trace: x.2,
+                        })
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
             suggestions,
         )
     }
@@ -371,12 +429,9 @@ impl<T: std::fmt::Debug> NFA<T> {
 impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
     fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)> {
         // TODO: collect payloads
-        //println!("self: {:#?}", self);
         let mut state = VecDeque::from([(&self.nodes[self.root], input)]);
-        //println!("state: {:#?}", state);
         let mut output = vec![];
         while let Some((node, string)) = state.pop_front() {
-            //println!("state: {:#?}, node: {:#?}, string: {}", state, node, string);
             if node.is_final {
                 if let Some(ref payload) = node.payload {
                     output.push((payload, string));
@@ -384,7 +439,11 @@ impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
                     // TODO: what is it's missing, or have value and not final...
                 }
             }
-            state.extend(self.node_parse(node, string));
+            state.extend(
+                self.node_parse(node, string)
+                    .into_iter()
+                    .map(|(a, b, _c)| (a, b)),
+            );
         }
         output
     }
