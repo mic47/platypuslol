@@ -5,6 +5,9 @@ pub use ambiguous_parser::*;
 pub use query_dsl::*;
 pub use nfa_parser::*;
 
+#[cfg(test)]
+mod nfa_parser_tests;
+
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

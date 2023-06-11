@@ -66,6 +66,7 @@ pub fn main() {
                         DslWord::Optional(ref word) => {
                             NFA::any_of(&[NFA::match_string(&word), NFA::match_string("")])
                         }
+                        // TODO: remove these, and have general regex in the DSL
                         // eat everything
                         DslWord::QueryString(ref word) => NFA::rest_of_string("<QUERY>".into()),
                         // Single word
