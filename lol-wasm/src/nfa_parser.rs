@@ -391,12 +391,16 @@ impl<T: std::fmt::Debug> NFA<T> {
         // else for suggestions.
         let mut suggestions = vec![];
         let mut visited: HashSet<NodeIndex> = Default::default();
+        let mut skip_suggesting_until = suggestion_states.len();
         while let Some((node, suggestion)) = suggestion_states.pop_front() {
-            if node.is_final {
+            if node.is_final && skip_suggesting_until <= 0 {
                 suggestions.push(Suggestion {
                     suggestion: format!("{}{}", input, suggestion.join("")),
                     payload: &node.payload,
                 })
+            }
+            if skip_suggesting_until > 0 {
+                skip_suggesting_until -= 1;
             }
             for (text, target_nodes) in node.get_suggestions() {
                 for target_node in target_nodes.iter().filter(|x| visited.insert(**x)) {

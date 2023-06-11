@@ -81,7 +81,19 @@ pub fn main() {
     );
     let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
     for p in parsed.into_iter() {
-        println!("{:#?}", p);
+        let mut link = p.payload.1.link.clone();
+        for trace in p.trace.iter() {
+            match trace {
+                lol_wasm::Trace::Edge(data) => {
+                    // TODO: we want to html escape this in better way. Probably in javascript
+                    // even?
+                    link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
+                }
+                lol_wasm::Trace::Node(_) => (),
+            }
+        }
+        //println!("{:#?}", p);
+        println!("{:#?}", link);
     }
     for s in suggested.into_iter() {
         println!("{:#?}", s);

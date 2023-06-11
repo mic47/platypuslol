@@ -4,7 +4,7 @@
     "link": "https://mail.google.com/mail/u/0"
   },
   {
-    "query": "search  mail {query}",
+    "query": "search mail {query}",
     "link": "https://mail.google.com/mail/u/0/#search/{query}"
   },
   {
@@ -28,23 +28,23 @@
     "link": "https://www.ikea.com/sk/sk/search/products/?q={query}"
   },
   {
-    "query": "search  google docs {query}",
+    "query": "search google docs {query}",
     "link": "https://docs.google.com/document/u/0/?q={query}&tgif=d"
   },
   {
-    "query": "create  google document",
+    "query": "create google document",
     "link": "https://docs.google.com/document/u/0/create"
   },
   {
-    "query": "create  google spreadsheet",
+    "query": "create google spreadsheet",
     "link": "https://docs.google.com/spreadsheets/u/0/create"
   },
   {
-    "query": "create  google presentation",
+    "query": "create google presentation",
     "link": "https://docs.google.com/presentation/u/0/create"
   },
   {
-    "query": "create  google drawing",
+    "query": "create google drawing",
     "link": "https://docs.google.com/drawings/u/1/create"
   },
   {
