@@ -260,10 +260,46 @@ impl NFA<()> {
     }
 
     pub fn rest_of_string(x: String) -> NFA<()> {
-        Self::nothing()
+        let nodes = vec![
+            Node {
+                payload: None,
+                is_final: false,
+                normal_edges: Default::default(),
+                regex_edges: vec![RegExEdge {
+                    expression: regex::Regex::new(r"\w+").unwrap(), // TODO: remove unwrap
+                    suggestion: "<QUERY>".into(),
+                    target: vec![1],
+                }],
+            },
+            Node {
+                payload: Some(()),
+                is_final: true,
+                normal_edges: Default::default(),
+                regex_edges: Default::default(),
+            },
+        ];
+        NFA { nodes, root: 0 }
     }
     pub fn word(x: String) -> NFA<()> {
-        Self::nothing()
+        let nodes = vec![
+            Node {
+                payload: None,
+                is_final: false,
+                normal_edges: Default::default(),
+                regex_edges: vec![RegExEdge {
+                    expression: regex::Regex::new(r".+").unwrap(), // TODO: remove unwrap
+                    suggestion: "<WORD>".into(),
+                    target: vec![1],
+                }],
+            },
+            Node {
+                payload: Some(()),
+                is_final: true,
+                normal_edges: Default::default(),
+                regex_edges: Default::default(),
+            },
+        ];
+        NFA { nodes, root: 0 }
     }
 }
 
