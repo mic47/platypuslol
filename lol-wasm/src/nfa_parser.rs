@@ -11,7 +11,7 @@ pub struct WithIdentifier<T> {
 
 #[derive(Clone, Debug)]
 pub enum Trace<T> {
-    Edge(WithIdentifier<String>),
+    Edge(WithIdentifier<EdgeData>),
     Node(T),
 }
 
@@ -24,11 +24,20 @@ pub struct RegExEdge {
 }
 
 #[derive(Clone, Debug)]
+pub struct SubstitutionEdge {
+    needles: Vec<(String, HashMap<String, String>)>,
+    suggestion: String,
+    target: Vec<NodeIndex>,
+    identifier: String,
+}
+
+#[derive(Clone, Debug)]
 pub struct Node<T> {
     payload: Option<T>,
     is_final: bool,
     normal_edges: HashMap<Length, HashMap<String, Vec<NodeIndex>>>,
     regex_edges: Vec<RegExEdge>,
+    substitution_edges: Vec<SubstitutionEdge>,
 }
 
 impl<T> Default for Node<T> {
@@ -38,8 +47,15 @@ impl<T> Default for Node<T> {
             is_final: false,
             normal_edges: Default::default(),
             regex_edges: Default::default(),
+            substitution_edges: Default::default(),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum EdgeData {
+    Match(String),
+    Substitution(HashMap<String, String>),
 }
 
 impl<T> Node<T> {
@@ -58,6 +74,7 @@ impl<T> Node<T> {
             is_final: self.is_final,
             normal_edges: self.normal_edges.clone(),
             regex_edges: self.regex_edges.clone(),
+            substitution_edges: self.substitution_edges.clone(),
         }
     }
 
@@ -80,6 +97,11 @@ impl<T> Node<T> {
         self
     }
 
+    pub fn with_substitution_edge(mut self, edge: SubstitutionEdge) -> Self {
+        self.substitution_edges.push(edge);
+        self
+    }
+
     pub fn with_normal_edges(mut self, edges: &[(&str, NodeIndex)]) -> Self {
         for (value, index) in edges.iter() {
             self.add_normal_edge((*value).into(), *index);
@@ -90,7 +112,7 @@ impl<T> Node<T> {
     pub fn get_matching_edges<'a>(
         &self,
         input: &'a str,
-    ) -> Vec<(NodeIndex, &'a str, Option<WithIdentifier<String>>)> {
+    ) -> Vec<(NodeIndex, &'a str, Option<WithIdentifier<EdgeData>>)> {
         let length = input.len();
         let normal_edges = self
             .normal_edges
@@ -123,7 +145,7 @@ impl<T> Node<T> {
                                 rest,
                                 Some(WithIdentifier {
                                     identifier: x.identifier.clone(),
-                                    payload: re_match.as_str().into(),
+                                    payload: EdgeData::Match(re_match.as_str().into()),
                                 }),
                             ));
                         }
@@ -134,13 +156,41 @@ impl<T> Node<T> {
                 }
             })
             .flatten();
-        normal_edges.chain(regex_edges).collect()
+        let mut substitution_edges = vec![];
+        for edge in self.substitution_edges.iter() {
+            for needle in edge.needles.iter() {
+                // TODO: use num_matches
+                if let Some((rest, _num_matches)) = subsequence(input, &needle.0) {
+                    for target_node in edge.target.iter() {
+                        substitution_edges.push((
+                            *target_node,
+                            rest,
+                            Some(WithIdentifier {
+                                identifier: edge.identifier.clone(),
+                                payload: EdgeData::Substitution(needle.1.clone()),
+                            }),
+                        ));
+                    }
+                }
+            }
+        }
+        normal_edges
+            .chain(regex_edges)
+            .chain(substitution_edges)
+            .collect()
     }
 
     pub fn get_suggestions<'a>(&'a self) -> Vec<(&'a String, &'a Vec<NodeIndex>)> {
         let normal_edges = self.normal_edges.values().flat_map(|x| x.iter());
         let regex_edges = self.regex_edges.iter().map(|x| (&x.suggestion, &x.target));
-        normal_edges.chain(regex_edges).collect()
+        let substitution_edges = self
+            .substitution_edges
+            .iter()
+            .map(|x| (&x.suggestion, &x.target));
+        normal_edges
+            .chain(regex_edges)
+            .chain(substitution_edges)
+            .collect()
     }
 }
 
@@ -166,6 +216,16 @@ impl<T: Clone> Node<T> {
                 .iter()
                 .map(|x| RegExEdge {
                     expression: x.expression.clone(),
+                    suggestion: x.suggestion.clone(),
+                    target: x.target.iter().map(|x| x + shift).collect(),
+                    identifier: x.identifier.clone(),
+                })
+                .collect(),
+            substitution_edges: self
+                .substitution_edges
+                .iter()
+                .map(|x| SubstitutionEdge {
+                    needles: x.needles.clone(),
                     suggestion: x.suggestion.clone(),
                     target: x.target.iter().map(|x| x + shift).collect(),
                     identifier: x.identifier.clone(),
@@ -283,11 +343,11 @@ impl NFA<()> {
         NFA { nodes, root: 0 }
     }
 
-    pub fn rest_of_string(identifier: String) -> NFA<()> {
+    pub fn regex(identifier: String, regex: regex::Regex) -> NFA<()> {
         let nodes = vec![
             Node::default().with_regex_edge(RegExEdge {
-                expression: regex::Regex::new(r".+").unwrap(), // TODO: remove unwrap
-                suggestion: "<QUERY>".into(),
+                expression: regex,
+                suggestion: "<QUERY>".into(), // TODO: set suggestions?
                 target: vec![1],
                 identifier,
             }),
@@ -295,13 +355,17 @@ impl NFA<()> {
         ];
         NFA { nodes, root: 0 }
     }
-    pub fn word(identifier: String) -> NFA<()> {
+
+    pub fn substitution(
+        identifier: String,
+        needles: Vec<(String, HashMap<String, String>)>,
+    ) -> NFA<()> {
         let nodes = vec![
-            Node::default().with_regex_edge(RegExEdge {
-                expression: regex::Regex::new(r"\w+").unwrap(), // TODO: remove unwrap
-                suggestion: "<WORD>".into(),
-                target: vec![1],
+            Node::default().with_substitution_edge(SubstitutionEdge {
+                suggestion: format!("<{}>", identifier),
                 identifier,
+                target: vec![1],
+                needles,
             }),
             Node::default().with_payload_and_final(()),
         ];
@@ -321,7 +385,7 @@ impl<T> NFA<T> {
         &'a self,
         node_self: &Node<T>,
         input: &'b str,
-    ) -> Vec<(&'a Node<T>, &'b str, Option<WithIdentifier<String>>)> {
+    ) -> Vec<(&'a Node<T>, &'b str, Option<WithIdentifier<EdgeData>>)> {
         node_self
             .get_matching_edges(input)
             .into_iter()
@@ -452,3 +516,29 @@ impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
         output
     }
 }
+
+fn subsequence<'a>(input: &'a str, query: &str) -> Option<(&'a str, usize)> {
+    let mut input_pointer = 0;
+    let mut query_pointer = 0;
+    let mut matched = 0;
+    let input_b = input.as_bytes();
+    let query_b = query.as_bytes();
+    while input_pointer < input_b.len() && query_pointer < query_b.len() {
+        if input_b[input_pointer] != query_b[query_pointer] {
+            query_pointer += 1;
+            matched += 1;
+        } else {
+            input_pointer += 1;
+            query_pointer += 1;
+        }
+    }
+    if matched == 0 {
+        None
+    } else {
+        while !input.is_char_boundary(input_pointer) && input_pointer > 0 {
+            input_pointer -= 1
+        }
+        Some((&input[input_pointer..], matched))
+    }
+}
+

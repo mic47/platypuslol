@@ -1,18 +1,19 @@
-use lol_wasm::{DslWord, NFA};
+use lol_wasm::{parse_link, parse_query, EdgeData, LinkToken, QueryToken, NFA};
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConfigLinkQuery {
-    query: String,
-    link: String,
+pub struct Config {
+    substitutions: HashMap<String, Vec<HashMap<String, String>>>,
+    redirects: Vec<ConfigLinkQuery<String>>,
 }
 
-pub struct Query {
-    pub parser: NFA<String>,
-    pub source: ConfigLinkQuery,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConfigLinkQuery<L> {
+    query: String,
+    link: L,
 }
 
 #[derive(clap::Parser)]
@@ -31,47 +32,66 @@ pub fn main() {
     // - [ ] Construct more advanced parser (actually use the DSL)
     // - [ ] Add substitutions
     let cli = <Cli as clap::Parser>::parse();
-    let config: Vec<ConfigLinkQuery> =
+    let config: Config =
         serde_json::from_str(&std::fs::read_to_string(cli.link_config).unwrap()).unwrap();
     let parser = NFA::any_of(
         &(config
+            .redirects
             .into_iter()
             // TODO: replace screw up suggestions
             .map(|c| {
-                let sentence = DslWord::parse_sentence(&c.query);
+                // TODO: handle errors here
+                let sentence = parse_query(&c.query).unwrap();
+                let link = parse_link(&c.link).unwrap();
+                // TODO: check that substitutions exists
+                let c = ConfigLinkQuery {
+                    query: c.query,
+                    link,
+                };
                 let mut prev = None;
                 let mut parsers = vec![];
                 for word in sentence {
                     if let Some(prev) = prev {
                         match word {
-                            DslWord::QueryString(_) => {
-                                parsers.push(NFA::match_one_or_more_spaces())
+                            QueryToken::Regex(_, _) => {
+                                parsers.push(NFA::match_one_or_more_spaces());
                             }
-                            DslWord::Query(_) => parsers.push(NFA::match_one_or_more_spaces()),
-                            DslWord::SubstitutionQuery(_) => (),
+                            QueryToken::Substitution(_, _, _) => {
+                                parsers.push(NFA::match_one_or_more_spaces());
+                            }
                             _ => match prev {
-                                DslWord::QueryString(_) => {
+                                QueryToken::Regex(_, _) => {
                                     parsers.push(NFA::match_one_or_more_spaces())
                                 }
-                                DslWord::Query(_) => parsers.push(NFA::match_one_or_more_spaces()),
-                                DslWord::SubstitutionQuery(_) => {
-                                    parsers.push(NFA::match_one_or_more_spaces())
+                                QueryToken::Substitution(_, _, _) => {
+                                    parsers.push(NFA::match_one_or_more_spaces());
                                 }
                                 _ => parsers.push(NFA::match_zero_or_more_spaces()),
                             },
                         }
                     }
                     parsers.push(match word {
-                        DslWord::Prefix(ref word) => NFA::match_non_empty_prefixes(&word),
-                        DslWord::Optional(ref word) => {
-                            NFA::any_of(&[NFA::match_string(&word), NFA::match_string("")])
+                        QueryToken::Exact(ref word) => NFA::match_string(&word),
+                        QueryToken::Prefix(ref word) => NFA::match_non_empty_prefixes(&word),
+                        QueryToken::Regex(ref identifier, ref regex) => {
+                            NFA::regex(identifier.clone(), regex.clone())
                         }
-                        // TODO: remove these, and have general regex in the DSL
-                        // eat everything
-                        DslWord::QueryString(ref word) => NFA::rest_of_string(word.clone()),
-                        // Single word
-                        DslWord::Query(ref word) => NFA::word(word.clone()),
-                        DslWord::SubstitutionQuery(_) => todo!(),
+                        QueryToken::Substitution(ref identifier, ref type_, ref subtype) => {
+                            NFA::substitution(
+                                identifier.clone(),
+                                config
+                                    .substitutions
+                                    .get(type_)
+                                    .map(|x| {
+                                        x.iter()
+                                            .filter_map(|x| {
+                                                x.get(subtype).map(|y| (y.clone(), x.clone()))
+                                            })
+                                            .collect()
+                                    })
+                                    .unwrap_or_default(),
+                            )
+                        }
                     });
                     prev = Some(word)
                 }
@@ -81,17 +101,49 @@ pub fn main() {
     );
     let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
     for p in parsed.into_iter() {
-        let mut link = p.payload.1.link.clone();
-        for trace in p.trace.iter() {
+        let mut matches: HashMap<String, String> = HashMap::default();
+        let mut substitutions: HashMap<String, HashMap<String, String>> = HashMap::default();
+        for trace in p.trace.into_iter() {
             match trace {
                 lol_wasm::Trace::Edge(data) => {
-                    // TODO: we want to html escape this in better way. Probably in javascript
-                    // even?
-                    link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
+                    match data.payload {
+                        EdgeData::Match(replacement) => {
+                            matches.insert(data.identifier.clone(), replacement);
+                        }
+                        EdgeData::Substitution(substitution) => {
+                            substitutions.insert(data.identifier.clone(), substitution);
+                        }
+                    };
                 }
                 lol_wasm::Trace::Node(_) => (),
             }
         }
+        let link = p.payload.1.link
+            .iter()
+            .map(|x| match x {
+                LinkToken::Exact(data) => data.clone(),
+                LinkToken::Replacement(replacement) => {
+                    if let Some(replacement) = matches.get(replacement) {
+                        // TODO: we want to html escape this in better way. Probably in javascript
+                        // even?
+                        replacement.clone().replace(" ", "+")
+                    } else {
+                        "ERROR".into()
+                    }
+                }
+                LinkToken::Substitution(type_, subtype) => {
+                    if let Some(replacement) =
+                        substitutions.get(type_).and_then(|x| x.get(subtype))
+                    {
+                        replacement.clone()
+                    } else {
+                        "ERROR".into()
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("");
+        //link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
         //println!("{:#?}", p);
         println!("{:#?}", link);
     }

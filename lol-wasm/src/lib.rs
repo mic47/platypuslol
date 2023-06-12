@@ -21,7 +21,7 @@ struct Test<T> {
 pub fn greet(name: &str) {
     let f = format!(
         "{:#?}",
-        nfa_parser::NFA::word("fooo".into()).parse_full_and_suggest("foo bar")
+        nfa_parser::NFA::match_non_empty_prefixes("fooo".into()).parse_full_and_suggest("foo bar")
     );
     let t = Test {
         a: Box::new(move |x| format!("Hello {} {}", x, f)),
