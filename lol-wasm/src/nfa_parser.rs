@@ -59,8 +59,21 @@ pub enum EdgeData {
 }
 
 impl<T> Node<T> {
-    pub fn with_payload_and_final(mut self, payload: T) -> Self {
-        self.payload = Some(payload);
+    pub fn with_payload_for_final<R: Clone>(self, payload: &R) -> Node<R> {
+        Node {
+            payload: if self.is_final {
+                Some(payload.clone())
+            } else {
+                None
+            },
+            is_final: self.is_final,
+            normal_edges: self.normal_edges,
+            regex_edges: self.regex_edges,
+            substitution_edges: self.substitution_edges,
+        }
+    }
+
+    pub fn make_final(mut self) -> Self {
         self.is_final = true;
         self
     }
@@ -242,6 +255,17 @@ pub struct NFA<T> {
 }
 
 impl<T> NFA<T> {
+    pub fn with_payload_for_final_nodes<R: Clone>(self, payload: &R) -> NFA<R> {
+        NFA {
+            nodes: self
+                .nodes
+                .into_iter()
+                .map(|node| node.with_payload_for_final(payload))
+                .collect(),
+            root: self.root,
+        }
+    }
+
     pub fn map<R, F: Fn(&T) -> R>(&self, f: &F) -> NFA<R> {
         NFA {
             nodes: self.nodes.iter().map(|x| x.map(f)).collect(),
@@ -309,7 +333,7 @@ impl NFA<()> {
     pub fn match_string(input: &str) -> NFA<()> {
         let nodes = vec![
             Node::default().with_normal_edge(input.into(), 1),
-            Node::default().with_payload_and_final(()),
+            Node::default().make_final(),
         ];
         NFA { nodes, root: 0 }
     }
@@ -321,14 +345,14 @@ impl NFA<()> {
                     .map(|len| (&input[0..len], 1))
                     .collect::<Vec<_>>()),
             ),
-            Node::default().with_payload_and_final(()),
+            Node::default().make_final(),
         ];
         NFA { nodes, root: 0 }
     }
 
     pub fn match_zero_or_more_spaces() -> NFA<()> {
         let nodes = vec![Node::default()
-            .with_payload_and_final(())
+            .make_final()
             .with_normal_edge(" ".into(), 0)];
         NFA { nodes, root: 0 }
     }
@@ -337,7 +361,7 @@ impl NFA<()> {
         let nodes = vec![
             Node::default().with_normal_edge(" ".into(), 1),
             Node::default()
-                .with_payload_and_final(())
+                .make_final()
                 .with_normal_edge(" ".into(), 1),
         ];
         NFA { nodes, root: 0 }
@@ -351,7 +375,7 @@ impl NFA<()> {
                 target: vec![1],
                 identifier,
             }),
-            Node::default().with_payload_and_final(()),
+            Node::default().make_final(),
         ];
         NFA { nodes, root: 0 }
     }
@@ -367,7 +391,7 @@ impl NFA<()> {
                 target: vec![1],
                 needles,
             }),
-            Node::default().with_payload_and_final(()),
+            Node::default().make_final(),
         ];
         NFA { nodes, root: 0 }
     }

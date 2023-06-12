@@ -95,7 +95,7 @@ pub fn main() {
                     });
                     prev = Some(word)
                 }
-                NFA::chain(&parsers).map(&move |x| (x.clone(), c.clone()))
+                NFA::chain(&parsers).with_payload_for_final_nodes(&c.link)
             })
             .collect::<Vec<_>>()),
     );
@@ -118,7 +118,7 @@ pub fn main() {
                 lol_wasm::Trace::Node(_) => (),
             }
         }
-        let link = p.payload.1.link
+        let link = p.payload
             .iter()
             .map(|x| match x {
                 LinkToken::Exact(data) => data.clone(),

@@ -21,7 +21,9 @@ struct Test<T> {
 pub fn greet(name: &str) {
     let f = format!(
         "{:#?}",
-        nfa_parser::NFA::match_non_empty_prefixes("fooo".into()).parse_full_and_suggest("foo bar")
+        // TODO regex module is in wasm. Consider something smaller
+        nfa_parser::NFA::regex("fooo".into(), regex::Regex::new(r"\w+").unwrap())
+            .parse_full_and_suggest("foo bar")
     );
     let t = Test {
         a: Box::new(move |x| format!("Hello {} {}", x, f)),
