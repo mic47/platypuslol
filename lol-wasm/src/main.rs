@@ -145,7 +145,7 @@ pub fn main() {
             .join("");
         //link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
         //println!("{:#?}", p);
-        println!("{:#?}", link);
+        println!("{:10.5}: {:#?}", p.score, link);
     }
     for s in suggested.into_iter() {
         println!("{:#?}", s);

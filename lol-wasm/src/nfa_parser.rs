@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet, VecDeque},
+};
 
 type Length = usize;
 type NodeIndex = usize;
@@ -125,7 +128,7 @@ impl<T> Node<T> {
     pub fn get_matching_edges<'a>(
         &self,
         input: &'a str,
-    ) -> Vec<(NodeIndex, &'a str, Option<WithIdentifier<EdgeData>>)> {
+    ) -> Vec<(NodeIndex, &'a str, f64, Option<WithIdentifier<EdgeData>>)> {
         let length = input.len();
         let normal_edges = self
             .normal_edges
@@ -136,7 +139,7 @@ impl<T> Node<T> {
                     let rest = input.split_at(*len).1;
                     edges
                         .into_iter()
-                        .map(|index| (*index, rest, None))
+                        .map(|index| (*index, rest, 0., None))
                         .collect()
                 } else {
                     vec![]
@@ -156,6 +159,7 @@ impl<T> Node<T> {
                             out.push((
                                 *target_node,
                                 rest,
+                                0.,
                                 Some(WithIdentifier {
                                     identifier: x.identifier.clone(),
                                     payload: EdgeData::Match(re_match.as_str().into()),
@@ -173,11 +177,17 @@ impl<T> Node<T> {
         for edge in self.substitution_edges.iter() {
             for needle in edge.needles.iter() {
                 // TODO: use num_matches
-                if let Some((rest, _num_matches)) = subsequence(input, &needle.0) {
+                if let Some((rest, num_matches)) = subsequence(input, &needle.0) {
+                    let needle_len = needle.0.len();
                     for target_node in edge.target.iter() {
                         substitution_edges.push((
                             *target_node,
                             rest,
+                            if needle_len == 0 {
+                                0.
+                            } else {
+                                (num_matches as f64 - needle_len as f64) / needle_len as f64
+                            },
                             Some(WithIdentifier {
                                 identifier: edge.identifier.clone(),
                                 payload: EdgeData::Substitution(needle.1.clone()),
@@ -351,18 +361,14 @@ impl NFA<()> {
     }
 
     pub fn match_zero_or_more_spaces() -> NFA<()> {
-        let nodes = vec![Node::default()
-            .make_final()
-            .with_normal_edge(" ".into(), 0)];
+        let nodes = vec![Node::default().make_final().with_normal_edge(" ".into(), 0)];
         NFA { nodes, root: 0 }
     }
 
     pub fn match_one_or_more_spaces() -> NFA<()> {
         let nodes = vec![
             Node::default().with_normal_edge(" ".into(), 1),
-            Node::default()
-                .make_final()
-                .with_normal_edge(" ".into(), 1),
+            Node::default().make_final().with_normal_edge(" ".into(), 1),
         ];
         NFA { nodes, root: 0 }
     }
@@ -409,11 +415,13 @@ impl<T> NFA<T> {
         &'a self,
         node_self: &Node<T>,
         input: &'b str,
-    ) -> Vec<(&'a Node<T>, &'b str, Option<WithIdentifier<EdgeData>>)> {
+    ) -> Vec<(&'a Node<T>, &'b str, f64, Option<WithIdentifier<EdgeData>>)> {
         node_self
             .get_matching_edges(input)
             .into_iter()
-            .map(|(index, rest, edge_payload)| (&self.nodes[index], rest, edge_payload))
+            .map(|(index, rest, score, edge_payload)| {
+                (&self.nodes[index], rest, score, edge_payload)
+            })
             .collect()
     }
 }
@@ -425,6 +433,7 @@ pub trait Parser<T> {
 #[derive(Clone, Debug)]
 pub struct Parsed<'a, T> {
     pub payload: &'a T,
+    pub score: f64,
     pub trace: Vec<Trace<&'a T>>,
 }
 
@@ -447,10 +456,10 @@ impl<T: std::fmt::Debug> NFA<T> {
         input: &'b str,
     ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
         // TODO: collect payloads
-        let mut state = VecDeque::from([(&self.nodes[self.root], input, vec![])]);
+        let mut state = VecDeque::from([(&self.nodes[self.root], input, 0., vec![])]);
         let mut output = vec![];
         let mut suggestion_states: VecDeque<(_, Vec<&str>)> = VecDeque::from([]);
-        while let Some((node, string, mut payloads)) = state.pop_front() {
+        while let Some((node, string, score, mut payloads)) = state.pop_front() {
             if string.is_empty() {
                 suggestion_states.push_back((node, vec![]))
             }
@@ -459,18 +468,18 @@ impl<T: std::fmt::Debug> NFA<T> {
             }
             if node.is_final {
                 if let Some(ref payload) = node.payload {
-                    output.push((payload, string, payloads.clone()));
+                    output.push((payload, string, score, payloads.clone()));
                 } else {
                     // TODO: what is it's missing, or have value and not final...
                 }
             }
             state.extend(self.node_parse(node, string).into_iter().map(
-                |(node, rest, edge_payload)| {
+                |(node, rest, edge_score, edge_payload)| {
                     let mut payloads = payloads.clone();
                     if let Some(edge_payload) = edge_payload {
                         payloads.push(Trace::Edge(edge_payload));
                     }
-                    (node, rest, payloads)
+                    (node, rest, score + edge_score, payloads)
                 },
             ));
         }
@@ -499,22 +508,27 @@ impl<T: std::fmt::Debug> NFA<T> {
             }
         }
 
-        (
-            output
-                .into_iter()
-                .filter_map(|x| {
-                    if x.1.is_empty() {
-                        Some(Parsed {
-                            payload: x.0,
-                            trace: x.2,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
-            suggestions,
-        )
+        let mut output: Vec<_> = output
+            .into_iter()
+            .filter_map(|x| {
+                if x.1.is_empty() {
+                    Some(Parsed {
+                        payload: x.0,
+                        score: x.2,
+                        trace: x.3,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        output.sort_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(Ordering::Greater)
+                .reverse()
+        });
+        (output, suggestions)
     }
 }
 
@@ -534,7 +548,7 @@ impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
             state.extend(
                 self.node_parse(node, string)
                     .into_iter()
-                    .map(|(a, b, _c)| (a, b)),
+                    .map(|(a, b, _c, _d)| (a, b)),
             );
         }
         output
@@ -550,10 +564,10 @@ fn subsequence<'a>(input: &'a str, query: &str) -> Option<(&'a str, usize)> {
     while input_pointer < input_b.len() && query_pointer < query_b.len() {
         if input_b[input_pointer] != query_b[query_pointer] {
             query_pointer += 1;
-            matched += 1;
         } else {
             input_pointer += 1;
             query_pointer += 1;
+            matched += 1;
         }
     }
     if matched == 0 {

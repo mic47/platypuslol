@@ -57,22 +57,6 @@
       "link": "https://docs.google.com/{product:url_part}/u/0/create"
     },
     {
-      "query": "create google document",
-      "link": "https://docs.google.com/document/u/0/create"
-    },
-    {
-      "query": "create google spreadsheet",
-      "link": "https://docs.google.com/spreadsheets/u/0/create"
-    },
-    {
-      "query": "create google presentation",
-      "link": "https://docs.google.com/presentation/u/0/create"
-    },
-    {
-      "query": "create google drawing",
-      "link": "https://docs.google.com/drawings/u/1/create"
-    },
-    {
       "query": "local elasticsearch {query}",
       "link": "http://localhost:9200/_search?q={query}"
     },
