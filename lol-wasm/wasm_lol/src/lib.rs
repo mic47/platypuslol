@@ -10,7 +10,7 @@ struct Test<T> {
 }
 
 #[wasm_bindgen]
-pub fn greet(name: &str) {
+pub fn greet(name: &str) -> String {
     let f = format!(
         "{:#?}",
         // TODO regex module is in wasm. Consider something smaller
@@ -20,5 +20,5 @@ pub fn greet(name: &str) {
     let t = Test {
         a: Box::new(move |x| format!("Hello {} {}", x, f)),
     };
-    alert(&(t.a)(name));
+    (t.a)(name)
 }

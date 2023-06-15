@@ -1,8 +1,8 @@
 ## TODO
 
 - [x] Split into separate crates: nfa parser, redirect query, command line tool, wasm module
-- [ ] Create mock extension (with faked suggestor)
-- [ ] Bundle WASM into extension
+- [x] Create mock extension (with faked suggestor)
+- [x] Bundle WASM into extension
 - [ ] Plug in the parser (with hardcoded config or something like that).
 - [ ] Figure out how to handle state, & configuration
 - [ ] Extension pages: conflict resolution

@@ -1,7 +1,7 @@
 
 
 wasm:
-	wasm-pack build --target web wasm_lol 
+	wasm-pack build --target web --out-dir ../extension/wasm_lol/ wasm_lol
 	
 ci:
 	cargo fmt && cargo test && cargo clippy --all-targets -- -D clippy::all -D warnings
