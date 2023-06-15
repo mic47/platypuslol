@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
+  "author": "mic47.dev@gmail.com",
   "name": "Platypul Lol",
-  "description": "Smart bookmarking tool",
+  "description": "Smart URL redirect tool",
   "version": "0.0",
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
   },
-  "omnibox": { "keyword" : "p" },
+  "omnibox": {
+    "keyword": "p"
+  },
   "background": {
     "service_worker": "platypus.js",
     "type": "module"
@@ -14,6 +17,8 @@
   "action": {
     "default_popup": "platypus.html",
     "default_icon": "platypus.png"
-  }
-}
-
+  },
+  "options_page": "options.html",
+  "permissions": [
+    "storage"
+  ]}

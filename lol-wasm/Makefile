@@ -5,6 +5,6 @@ ci:
 	cargo fmt && cargo test && cargo clippy --all-targets -- -D clippy::all -D warnings
 
 run:
-	cargo run --bin tool -- --link-config commands.json --query "create google rawg"
+	cargo run --bin tool -- --link-config extension/commands.json --query "create google rawg"
 suggest:
-	cargo run --bin tool -- --link-config commands.json --query "cr"
+	cargo run --bin tool -- --link-config extension/commands.json --query "cr"
