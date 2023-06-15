@@ -1,8 +1,9 @@
-import init, {suggest, redirect, init_parser} from './wasm_lol/lol_wasm.js';
+import init, {init_parser} from './wasm_lol/lol_wasm.js';
+
+var parser = null;
 
 init().then(() => {
-  console.log("INITIALIZING");
-  init_parser("parser", JSON.stringify({
+  parser = init_parser(JSON.stringify({
     "substitutions": {
       "product": [
         {
@@ -94,11 +95,9 @@ init().then(() => {
       }
     ]
   }));
-  console.log("INITIALIZED");
 })
 
 chrome.omnibox.onInputStarted.addListener(() => {
-  console.log('Input started');
 })
 
 function escapeHTML(string){
@@ -109,10 +108,7 @@ function escapeHTML(string){
 }
 
 chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
-  console.log("Changed", text);
-  console.log("Changed sug", send_suggestion);
-  let sug = suggest("parser", text);
-  console.log("PARSING", text, sug)
+  let sug = parser.suggest(text);
   let suggestions = JSON.parse(sug);
   var output = [];
   for (var i = 0; i < suggestions.length ; i++) {
@@ -127,10 +123,10 @@ chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
 })
 
 chrome.omnibox.onInputEntered.addListener((text) => {
-  console.log("On input entered", text);
-  let link = redirect("parser", text);
-  //const newURL = 'https://www.google.com/search?q=' + encodeURIComponent(text);
-
+  let link = parser.redirect(text);
+  if (link == undefined || link == null) {
+    return
+  }
   let queryOptions = { active: true, lastFocusedWindow: true };
   chrome.tabs.query(queryOptions).then(([tab]) => {
     if (tab != undefined) {

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::RwLock;
 
 use nfa::NFA;
 use redirect::{
@@ -9,58 +8,66 @@ use redirect::{
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
 #[derive(Deserialize)]
-pub struct JsQueryLink {
-    query: String,
-    link: String,
+pub struct JsConfig {
+    substitutions: HashMap<String, Vec<HashMap<String, String>>>,
+    redirects: Vec<ConfigLinkQuery<String>>,
 }
 
-impl From<JsQueryLink> for ConfigLinkQuery<String> {
-    fn from(c: JsQueryLink) -> Self {
-        Self {
-            query: c.query.clone(),
-            link: c.link,
+#[wasm_bindgen]
+pub struct ExtensionParser {
+    parser: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
+}
+
+#[wasm_bindgen]
+impl ExtensionParser {
+    #[wasm_bindgen]
+    pub fn redirect(&self, text: &str) -> Option<String> {
+        let (parsed, _) = self.parser.parse_full_and_suggest(text);
+        if let Some(p) = parsed.into_iter().next() {
+            let ResolvedParsedOutput {
+                score: _,
+                link,
+                description: _,
+            } = resolve_parsed_output(p);
+            Some(link)
+        } else {
+            None
         }
+    }
+
+    #[wasm_bindgen]
+    pub fn suggest(&self, text: &str) -> String {
+        let (parsed, suggestions) = self.parser.parse_full_and_suggest(text);
+        let mut output = vec![];
+        for p in parsed.into_iter() {
+            let ResolvedParsedOutput {
+                score: _,
+                link,
+                description,
+            } = resolve_parsed_output(p);
+            output.push(Suggestion {
+                text: description,
+                link,
+            })
+        }
+        for s in suggestions.into_iter() {
+            let text = resolve_suggestion_output(s);
+            output.push(Suggestion {
+                text: text.clone(),
+                link: text,
+            })
+        }
+
+        serde_json::to_string(&output).unwrap()
     }
 }
 
 #[wasm_bindgen]
-#[derive(Deserialize)]
-pub struct JsConfig {
-    substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-    redirects: Vec<JsQueryLink>,
-}
-
-type ParserType = RwLock<HashMap<String, NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>;
-
-lazy_static::lazy_static! {
-  static ref PARSERS: ParserType = RwLock::new(Default::default());
-}
-
-#[wasm_bindgen]
-pub fn init_parser(parser_name: &str, js_config: &str) {
+pub fn init_parser(js_config: &str) -> ExtensionParser {
     let config: JsConfig = serde_json::from_str(js_config).unwrap();
-    let redirects: Vec<ConfigLinkQuery<String>> =
-        config.redirects.into_iter().map(Into::into).collect();
-    let parser = create_parser(redirects, config.substitutions);
-    PARSERS.write().unwrap().insert(parser_name.into(), parser);
-}
-
-#[wasm_bindgen]
-pub fn redirect(parser_name: &str, text: &str) -> Option<String> {
-    let lock = PARSERS.read().unwrap();
-    let parser = lock.get(parser_name).unwrap();
-    let (parsed, _) = parser.parse_full_and_suggest(text);
-    if let Some(p) = parsed.into_iter().next() {
-        let ResolvedParsedOutput {
-            score: _,
-            link,
-            description: _,
-        } = resolve_parsed_output(p);
-        Some(link)
-    } else {
-        None
+    ExtensionParser {
+        parser: create_parser(config.redirects, config.substitutions),
     }
 }
 
@@ -69,32 +76,4 @@ pub fn redirect(parser_name: &str, text: &str) -> Option<String> {
 pub struct Suggestion {
     text: String,
     link: String,
-}
-
-#[wasm_bindgen]
-pub fn suggest(parser_name: &str, text: &str) -> String {
-    let lock = PARSERS.read().unwrap();
-    let parser = lock.get(parser_name).unwrap();
-    let (parsed, suggestions) = parser.parse_full_and_suggest(text);
-    let mut output = vec![];
-    for p in parsed.into_iter() {
-        let ResolvedParsedOutput {
-            score: _,
-            link,
-            description,
-        } = resolve_parsed_output(p);
-        output.push(Suggestion {
-            text: description,
-            link,
-        })
-    }
-    for s in suggestions.into_iter() {
-        let text = resolve_suggestion_output(s);
-        output.push(Suggestion {
-            text: text.clone(),
-            link: text,
-        })
-    }
-
-    serde_json::to_string(&output).unwrap()
 }

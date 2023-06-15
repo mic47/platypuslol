@@ -6,7 +6,8 @@
 - [x] Plug in the parser (with hardcoded config or something like that).
 - [x] Fix suggestion behavior -- return multiple suggestions for substitutions
 - [x] Fix suggestion behavior -- return multipls suggestions in middle of substitution
-- [ ] Figure out how to handle state, & configuration
+- [x] Figure out how to handle state
+- [ ] Figure out how to handle configuration
 - [ ] Extension pages: conflict resolution
 - [ ] Extension pages: list of all commands
 - [ ] Extension pages: configuration

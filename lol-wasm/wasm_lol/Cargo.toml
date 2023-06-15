@@ -10,7 +10,6 @@ name = "lol_wasm"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-lazy_static.workspace = true
 nfa.workspace = true
 redirect.workspace = true
 regex.workspace = true
