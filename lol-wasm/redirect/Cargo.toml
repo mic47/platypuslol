@@ -1,0 +1,13 @@
+[package]
+name = "redirect"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "redirect"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+nfa.workspace = true
+regex.workspace = true
+serde.workspace = true

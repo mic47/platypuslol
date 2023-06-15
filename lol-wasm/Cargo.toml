@@ -1,20 +1,25 @@
-[package]
-name = "lol-wasm"
-version = "0.1.0"
+[workspace]
+
+resolver = "2"
+members = [
+  "nfa",
+  "redirect",
+  "tool",
+  "wasm_lol",
+]
+
+[workspace.package]
 edition = "2021"
+version = "0.0.0"
 
-[lib]
-name = "lol_wasm"
-crate-type = ["cdylib", "lib"]
+[workspace.dependencies]
+nfa = { path="nfa" }
+redirect = { path = "redirect" }
+tool = { path = "tool" }
+wasm_lol = { path = "wasm_lol" }
 
-[[bin]]
-name = "lol"
-path = "src/main.rs"
-
-[dependencies]
 clap = { version = "4.3.3", features = ["derive"]}
-wasm-bindgen = "0.2.86"
-serde = { version = "1.0.164" , features = ["derive"] }
-serde_json = "1.0.96"
 regex = "1.8.4"
-
+serde_json = "1.0.96"
+serde = { version = "1.0.164" , features = ["derive"] }
+wasm-bindgen = "0.2.86"

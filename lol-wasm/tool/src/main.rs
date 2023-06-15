@@ -1,8 +1,8 @@
-use lol_wasm::{create_parser, resolve_parsed_output, ConfigLinkQuery};
-
 use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
+
+use redirect::{create_parser, resolve_parsed_output, ConfigLinkQuery};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {

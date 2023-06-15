@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{parse_link, parse_query, EdgeData, LinkToken, Parsed, QueryToken, Trace, NFA};
+use crate::{parse_link, parse_query, LinkToken, QueryToken};
+use nfa::{EdgeData, Parsed, Trace, NFA};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfigLinkQuery<L> {

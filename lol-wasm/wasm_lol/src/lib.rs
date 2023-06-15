@@ -1,13 +1,3 @@
-mod nfa_parser;
-mod query_dsl;
-mod redirect;
-pub use nfa_parser::*;
-pub use query_dsl::*;
-pub use redirect::*;
-
-#[cfg(test)]
-mod nfa_parser_tests;
-
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -24,7 +14,7 @@ pub fn greet(name: &str) {
     let f = format!(
         "{:#?}",
         // TODO regex module is in wasm. Consider something smaller
-        nfa_parser::NFA::regex("fooo".into(), regex::Regex::new(r"\w+").unwrap())
+        nfa::NFA::regex("fooo".into(), regex::Regex::new(r"\w+").unwrap())
             .parse_full_and_suggest("foo bar")
     );
     let t = Test {
