@@ -1,7 +1,9 @@
 mod nfa_parser;
 mod query_dsl;
+mod redirect;
 pub use nfa_parser::*;
 pub use query_dsl::*;
+pub use redirect::*;
 
 #[cfg(test)]
 mod nfa_parser_tests;
@@ -30,4 +32,3 @@ pub fn greet(name: &str) {
     };
     alert(&(t.a)(name));
 }
-

@@ -29,7 +29,8 @@ fn test_chain_2_elements() {
     let parser = NFA::chain(&[
         NFA::match_non_empty_prefixes("foo"),
         NFA::match_non_empty_prefixes("bar"),
-    ]).with_payload_for_final_nodes(&());
+    ])
+    .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
     assert_eq!(parser.parse_full("f"), empty);
@@ -47,7 +48,8 @@ fn test_chain_3_elements_with_non_zero_space() {
         NFA::match_non_empty_prefixes("foo"),
         NFA::match_one_or_more_spaces(),
         NFA::match_non_empty_prefixes("bar"),
-    ]).with_payload_for_final_nodes(&());
+    ])
+    .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
     assert_eq!(parser.parse_full("f"), empty);
@@ -68,7 +70,8 @@ fn test_chain_3_elements_with_zero_space() {
         NFA::match_non_empty_prefixes("foo"),
         NFA::match_zero_or_more_spaces(),
         NFA::match_non_empty_prefixes("bar"),
-    ]).with_payload_for_final_nodes(&());
+    ])
+    .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
     assert_eq!(parser.parse_full("f"), empty);
@@ -89,7 +92,8 @@ fn test_any_of() {
         NFA::match_non_empty_prefixes("foo"),
         NFA::match_non_empty_prefixes("feee"),
         NFA::match_string("bar"),
-    ]).with_payload_for_final_nodes(&());
+    ])
+    .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
     assert_eq!(parser.parse_full("f"), vec![&(), &()]);

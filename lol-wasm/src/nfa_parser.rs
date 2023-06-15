@@ -579,4 +579,3 @@ fn subsequence<'a>(input: &'a str, query: &str) -> Option<(&'a str, usize)> {
         Some((&input[input_pointer..], matched))
     }
 }
-
