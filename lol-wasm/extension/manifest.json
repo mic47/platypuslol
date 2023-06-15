@@ -11,7 +11,7 @@
     "keyword": "p"
   },
   "background": {
-    "service_worker": "platypus.js",
+    "service_worker": "service_worker.js",
     "type": "module"
   },
   "action": {
