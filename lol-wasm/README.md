@@ -1,6 +1,6 @@
 ## TODO
 
-- [ ] Split into separate crates: nfa parser, redirect query, command line tool, wasm module
+- [x] Split into separate crates: nfa parser, redirect query, command line tool, wasm module
 - [ ] Create mock extension (with faked suggestor)
 - [ ] Bundle WASM into extension
 - [ ] Plug in the parser (with hardcoded config or something like that).
@@ -8,5 +8,7 @@
 - [ ] Extension pages: conflict resolution
 - [ ] Extension pages: list of all commands
 - [ ] Extension pages: configuration
+- [ ] Fix suggestions behavior (return longer items)
+- [ ] Add more tests to all parser parts to document expectations / behavior of modules
 - [ ] Add better parser error handling -- more useful errors
 - [ ] Consider removing regex node for compile time weight (or not bundle it into wasm).
