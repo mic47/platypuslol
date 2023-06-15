@@ -1,5 +1,3 @@
-
-
 wasm:
 	wasm-pack build --target web --out-dir ../extension/wasm_lol/ wasm_lol
 	

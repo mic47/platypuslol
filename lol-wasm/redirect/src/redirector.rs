@@ -7,8 +7,8 @@ use nfa::{EdgeData, Parsed, Trace, NFA};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfigLinkQuery<L> {
-    query: String,
-    link: L,
+    pub query: String,
+    pub link: L,
 }
 
 pub fn create_parser(

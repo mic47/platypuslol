@@ -10,7 +10,10 @@ name = "lol_wasm"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+lazy_static.workspace = true
 nfa.workspace = true
 redirect.workspace = true
 regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 wasm-bindgen.workspace = true

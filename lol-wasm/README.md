@@ -3,7 +3,8 @@
 - [x] Split into separate crates: nfa parser, redirect query, command line tool, wasm module
 - [x] Create mock extension (with faked suggestor)
 - [x] Bundle WASM into extension
-- [ ] Plug in the parser (with hardcoded config or something like that).
+- [x] Plug in the parser (with hardcoded config or something like that).
+- [ ] Fix suggestion behavior -- return multiple suggestions for substitutions
 - [ ] Figure out how to handle state, & configuration
 - [ ] Extension pages: conflict resolution
 - [ ] Extension pages: list of all commands
