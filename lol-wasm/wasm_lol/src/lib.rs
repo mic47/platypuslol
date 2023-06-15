@@ -52,10 +52,10 @@ impl ExtensionParser {
             })
         }
         for s in suggestions.into_iter() {
-            let text = resolve_suggestion_output(s);
+            let s = resolve_suggestion_output(s);
             output.push(Suggestion {
-                text: text.clone(),
-                link: text,
+                text: s.description,
+                link: s.link.unwrap_or(Default::default()),
             })
         }
 

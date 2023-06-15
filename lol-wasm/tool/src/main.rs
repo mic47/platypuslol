@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -43,8 +46,11 @@ pub fn main() {
         //println!("{:#?}", p);
         println!("{:10.5}: '{}', {:#?}", score, description, link);
     }
+    let mut visited: HashSet<_> = HashSet::default();
     for s in suggested.into_iter() {
         let s = resolve_suggestion_output(s);
-        println!("{:#?}", s);
+        if visited.insert(s.clone()) {
+            println!("{}: {}", s.description, s.link.unwrap_or(String::default()));
+        }
     }
 }

@@ -116,34 +116,39 @@ pub fn resolve_parsed_output(p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>) -> Re
     let (matches, substitutions) = process_trace(p.trace);
     ResolvedParsedOutput {
         score: p.score,
-        link: p
-            .payload
-            .0
-            .iter()
-            .map(|x| match x {
-                LinkToken::Exact(data) => data.clone(),
-                LinkToken::Replacement(replacement) => {
-                    if let Some(replacement) = matches.get(replacement) {
-                        // TODO: we want to html escape this in better way. Probably in javascript
-                        // even?
-                        replacement.clone().replace(' ', "+")
-                    } else {
-                        "ERROR".into()
-                    }
-                }
-                LinkToken::Substitution(type_, subtype) => {
-                    if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype))
-                    {
-                        replacement.clone()
-                    } else {
-                        "ERROR".into()
-                    }
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(""),
+        link: process_query(&matches, &substitutions, &p.payload.0),
         description: process_suggestion(&matches, &substitutions, &p.payload.1),
     }
+}
+
+fn process_query(
+    matches: &HashMap<String, String>,
+    substitutions: &HashMap<String, HashMap<String, String>>,
+    query: &[LinkToken],
+) -> String {
+    query
+        .iter()
+        .map(|x| match x {
+            LinkToken::Exact(data) => data.clone(),
+            LinkToken::Replacement(replacement) => {
+                if let Some(replacement) = matches.get(replacement) {
+                    // TODO: we want to html escape this in better way. Probably in javascript
+                    // even?
+                    replacement.clone().replace(' ', "+")
+                } else {
+                    "<query>".into()
+                }
+            }
+            LinkToken::Substitution(type_, subtype) => {
+                if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype)) {
+                    replacement.clone()
+                } else {
+                    format!("<{}>", type_)
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn process_suggestion(
@@ -177,13 +182,25 @@ fn process_suggestion(
         .join(" ")
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct ResolvedSuggestionOutput {
+    pub link: Option<String>,
+    pub description: String,
+}
+
 pub fn resolve_suggestion_output(
     suggestion: Suggestion<(Vec<LinkToken>, Vec<QueryToken>)>,
-) -> String {
+) -> ResolvedSuggestionOutput {
     let (matches, substitutions) = process_trace(suggestion.trace);
-    suggestion
-        .payload
-        .as_ref()
-        .map(|x| process_suggestion(&matches, &substitutions, &x.1))
-        .unwrap_or(suggestion.suggestion)
+    ResolvedSuggestionOutput {
+        description: suggestion
+            .payload
+            .as_ref()
+            .map(|x| process_suggestion(&matches, &substitutions, &x.1))
+            .unwrap_or(suggestion.suggestion),
+        link: suggestion
+            .payload
+            .as_ref()
+            .map(|x| process_query(&matches, &substitutions, &x.0)),
+    }
 }

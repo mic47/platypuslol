@@ -8,7 +8,7 @@
 - [x] Fix suggestion behavior -- return multipls suggestions in middle of substitution
 - [x] Figure out how to handle state
 - [x] Figure out how to handle configuration
-- [ ] Extension pages: conflict resolution
+- [x] ~Extension pages: conflict resolution~ -- canceled, no conflict resolution, just everything
 - [ ] Extension pages: list of all commands
 - [ ] Extension pages: configuration
 - [ ] Options validation

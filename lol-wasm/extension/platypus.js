@@ -33,7 +33,7 @@ chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
     output.push({
       content: sug["text"],
       deletable: false,
-      description: escapeHTML(sug["text"]),
+      description: escapeHTML(sug["text"]) + " ➡️  " + escapeHTML(sug["link"]),
     });
   }
   send_suggestion(output);
