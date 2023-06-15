@@ -15,4 +15,5 @@
 - [ ] Fix suggestions behavior (return longer items) - [ ] Add more tests to all parser parts to document expectations / behavior of modules
 - [ ] Add better parser error handling -- more useful errors
 - [ ] Default to google or other configurable search engine
+- [ ] Make it possible to load parser from external configured url.
 - [ ] Consider removing regex node for compile time weight (or not bundle it into wasm).
