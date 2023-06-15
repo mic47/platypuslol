@@ -14,7 +14,7 @@ pub struct ConfigLinkQuery<L> {
 pub fn create_parser(
     redirects: Vec<ConfigLinkQuery<String>>,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-) -> NFA<Vec<LinkToken>> {
+) -> NFA<(Vec<LinkToken>, Vec<QueryToken>)> {
     NFA::any_of(
         &(redirects
             .into_iter()
@@ -30,7 +30,7 @@ pub fn create_parser(
                 };
                 let mut prev = None;
                 let mut parsers = vec![];
-                for word in sentence {
+                for word in sentence.iter() {
                     if let Some(prev) = prev {
                         match word {
                             QueryToken::Regex(_, _) => {
@@ -72,15 +72,21 @@ pub fn create_parser(
                             )
                         }
                     });
-                    prev = Some(word)
+                    prev = Some(word.clone())
                 }
-                NFA::chain(&parsers).with_payload_for_final_nodes(&c.link)
+                NFA::chain(&parsers).with_payload_for_final_nodes(&(c.link, sentence))
             })
             .collect::<Vec<_>>()),
     )
 }
 
-pub fn resolve_parsed_output(p: Parsed<Vec<LinkToken>>) -> (f64, String) {
+pub struct ResolvedParsedOutput {
+    pub score: f64,
+    pub link: String,
+    pub description: String,
+}
+
+pub fn resolve_parsed_output(p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>) -> ResolvedParsedOutput {
     let mut matches: HashMap<String, String> = HashMap::default();
     let mut substitutions: HashMap<String, HashMap<String, String>> = HashMap::default();
     for trace in p.trace.into_iter() {
@@ -98,9 +104,11 @@ pub fn resolve_parsed_output(p: Parsed<Vec<LinkToken>>) -> (f64, String) {
             Trace::Node(_) => (),
         }
     }
-    (
-        p.score,
-        p.payload
+    ResolvedParsedOutput {
+        score: p.score,
+        link: p
+            .payload
+            .0
             .iter()
             .map(|x| match x {
                 LinkToken::Exact(data) => data.clone(),
@@ -124,5 +132,32 @@ pub fn resolve_parsed_output(p: Parsed<Vec<LinkToken>>) -> (f64, String) {
             })
             .collect::<Vec<_>>()
             .join(""),
-    )
+        description: p
+            .payload
+            .1
+            .iter()
+            .map(|x| match x {
+                QueryToken::Exact(data) => data.clone(),
+                QueryToken::Prefix(data) => data.clone(),
+                QueryToken::Regex(replacement, _) => {
+                    if let Some(replacement) = matches.get(replacement) {
+                        // TODO: we want to html escape this in better way. Probably in javascript
+                        // even?
+                        replacement.clone().replace(' ', "+")
+                    } else {
+                        "ERROR".into()
+                    }
+                }
+                QueryToken::Substitution(type_, _, subtype) => {
+                    if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype))
+                    {
+                        replacement.clone()
+                    } else {
+                        "ERROR".into()
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
+    }
 }

@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use redirect::{create_parser, resolve_parsed_output, ConfigLinkQuery};
+use redirect::{create_parser, resolve_parsed_output, ConfigLinkQuery, ResolvedParsedOutput};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -31,10 +31,14 @@ pub fn main() {
     let parser = create_parser(config.redirects, config.substitutions);
     let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
     for p in parsed.into_iter() {
-        let (score, link) = resolve_parsed_output(p);
+        let ResolvedParsedOutput {
+            score,
+            link,
+            description,
+        } = resolve_parsed_output(p);
         //link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
         //println!("{:#?}", p);
-        println!("{:10.5}: {:#?}", score, link);
+        println!("{:10.5}: '{}', {:#?}", score, description, link);
     }
     for s in suggested.into_iter() {
         println!("{:#?}", s);

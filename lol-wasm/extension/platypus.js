@@ -120,7 +120,7 @@ chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
     output.push({
       content: sug["text"],
       deletable: false,
-      description: escapeHTML(sug["link"]),
+      description: escapeHTML(sug["text"]),
     });
   }
   send_suggestion(output);

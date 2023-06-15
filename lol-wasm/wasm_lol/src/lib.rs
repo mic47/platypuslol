@@ -2,7 +2,10 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 use nfa::NFA;
-use redirect::{create_parser, resolve_parsed_output, ConfigLinkQuery, LinkToken};
+use redirect::{
+    create_parser, resolve_parsed_output, ConfigLinkQuery, LinkToken, QueryToken,
+    ResolvedParsedOutput,
+};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -17,7 +20,7 @@ impl From<JsQueryLink> for ConfigLinkQuery<String> {
     fn from(c: JsQueryLink) -> Self {
         Self {
             query: c.query.clone(),
-            link: c.link.clone(),
+            link: c.link,
         }
     }
 }
@@ -30,7 +33,7 @@ pub struct JsConfig {
 }
 
 lazy_static::lazy_static! {
-  static ref PARSERS: RwLock<HashMap<String, NFA<Vec<LinkToken>>>> = RwLock::new(Default::default());
+  static ref PARSERS: RwLock<HashMap<String, NFA<(Vec<LinkToken>, Vec<QueryToken>)>>> = RwLock::new(Default::default());
 }
 
 #[wasm_bindgen]
@@ -48,7 +51,11 @@ pub fn redirect(parser_name: &str, text: &str) -> Option<String> {
     let parser = lock.get(parser_name).unwrap();
     let (parsed, _) = parser.parse_full_and_suggest(text);
     for p in parsed.into_iter() {
-        let (_score, link) = resolve_parsed_output(p);
+        let ResolvedParsedOutput {
+            score: _,
+            link,
+            description: _,
+        } = resolve_parsed_output(p);
         return Some(link);
     }
     None
@@ -68,9 +75,13 @@ pub fn suggest(parser_name: &str, text: &str) -> String {
     let (parsed, suggestions) = parser.parse_full_and_suggest(text);
     let mut output = vec![];
     for p in parsed.into_iter() {
-        let (_score, link) = resolve_parsed_output(p);
+        let ResolvedParsedOutput {
+            score: _,
+            link,
+            description,
+        } = resolve_parsed_output(p);
         output.push(Suggestion {
-            text: text.into(),
+            text: description,
             link,
         })
     }
