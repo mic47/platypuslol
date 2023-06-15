@@ -11,7 +11,7 @@
 - [x] ~Extension pages: conflict resolution~ -- canceled, no conflict resolution, just everything
 - [x] Extension pages: list of all commands
 - [x] Extension pages: configuration
-- [ ] Options validation
+- [x] Options validation
 - [ ] Fix suggestions behavior (return longer items)
 - [ ] Add more tests to all parser parts to document expectations / behavior of modules
 - [ ] Add better parser error handling -- more useful errors
@@ -21,3 +21,4 @@
 - [ ] Remove unwraps, handle errors properly everywhere
 - [ ] Removal of duplicit suggestions in API, not in client
 - [ ] Foldable list of command for same type of suggestion (substitutions)
+- [ ] Better validation errors and documentation

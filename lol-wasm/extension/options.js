@@ -1,8 +1,13 @@
+import init, {init_parser} from './wasm_lol/lol_wasm.js';
+
+init()
 
 // Saves options to chrome.storage
 const saveOptions = () => {
   try {
-    const config = JSON.parse(document.getElementById('config').value);
+    const json_config = document.getElementById('config').value;
+    init_parser(json_config);
+    const config = JSON.parse(json_config);
     chrome.storage.sync.set(
       { config: JSON.stringify(config) },
       () => {

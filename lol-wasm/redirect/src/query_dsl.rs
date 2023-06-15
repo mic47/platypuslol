@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 #[derive(Clone, Debug)]
 pub struct Substitution {
     pub name: String,
@@ -153,4 +155,59 @@ pub fn parse_link(input: &str) -> Result<Vec<LinkToken>, String> {
             }
         })
         .collect()
+}
+
+pub fn validate_query_with_link(
+    query: &[QueryToken],
+    query_str: &str,
+    link: &[LinkToken],
+    link_str: &str,
+) -> Result<(), String> {
+    let link_replacement_types = link
+        .iter()
+        .filter_map(|x| match x {
+            LinkToken::Replacement(data) => Some(data),
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+    let query_replacement_types = query
+        .iter()
+        .filter_map(|x| match x {
+            QueryToken::Regex(data, _) => Some(data),
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+    let difference = link_replacement_types
+        .difference(&query_replacement_types)
+        .collect::<Vec<_>>();
+    if !difference.is_empty() {
+        return Err(format!(
+            "Following replacements are in the link but not in query: {:?}. Query: '{}', link: '{}'",
+            difference, query_str, link_str,
+        ));
+    }
+    let link_substitution_types = link
+        .iter()
+        .filter_map(|x| match x {
+            LinkToken::Substitution(type_, _) => Some(type_),
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+    let query_substitution_types = query
+        .iter()
+        .filter_map(|x| match x {
+            QueryToken::Substitution(type_, _, _) => Some(type_),
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+    let difference = link_substitution_types
+        .difference(&query_substitution_types)
+        .collect::<Vec<_>>();
+    if !difference.is_empty() {
+        return Err(format!(
+            "Following substitutions are in the link but not in query: {:?}. Query: '{}', link: '{}'",
+            difference, query_str, link_str,
+        ));
+    }
+    Ok(())
 }

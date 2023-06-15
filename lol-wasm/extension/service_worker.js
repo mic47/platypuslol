@@ -32,6 +32,7 @@ function escapeHTML(string){
 
 chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
   let sug = parser.suggest(text);
+	console.log(sug);
   let suggestions = JSON.parse(sug);
   var output = [];
   for (var i = 0; i < suggestions.length ; i++) {

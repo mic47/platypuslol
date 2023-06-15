@@ -1,4 +1,5 @@
 fill_suggestions();
+
 function fill_suggestions() {
 	chrome.storage.local.get(["default_suggestion"]).then(({default_suggestion}) => {
 		const suggestions = JSON.parse(default_suggestion)

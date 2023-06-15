@@ -37,7 +37,7 @@ impl ExtensionParser {
     }
 
     #[wasm_bindgen]
-    pub fn suggest(&self, text: &str) -> String {
+    pub fn suggest(&self, text: &str) -> Result<String, String> {
         let (parsed, suggestions) = self.parser.parse_full_and_suggest(text);
         let mut output = vec![];
         for p in parsed.into_iter() {
@@ -58,17 +58,19 @@ impl ExtensionParser {
                 link: s.link.unwrap_or(Default::default()),
             })
         }
-
-        serde_json::to_string(&output).unwrap()
+        serde_json::to_string(&output).map_err(|x| x.to_string())
     }
 }
 
 #[wasm_bindgen]
-pub fn init_parser(js_config: &str) -> ExtensionParser {
-    let config: JsConfig = serde_json::from_str(js_config).unwrap();
-    ExtensionParser {
-        parser: create_parser(config.redirects, config.substitutions),
-    }
+pub fn init_parser(js_config: &str) -> Result<ExtensionParser, String> {
+    let config: JsConfig = serde_path_to_error::deserialize(
+        serde_json::from_str::<serde_json::Value>(js_config).map_err(|x| x.to_string())?,
+    )
+    .map_err(|x| x.to_string())?;
+    Ok(ExtensionParser {
+        parser: create_parser(config.redirects, config.substitutions)?,
+    })
 }
 
 #[wasm_bindgen]

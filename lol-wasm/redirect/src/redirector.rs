@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{parse_link, parse_query, LinkToken, QueryToken};
+use crate::{parse_link, parse_query, LinkToken, QueryToken, validate_query_with_link};
 use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -14,16 +14,16 @@ pub struct ConfigLinkQuery<L> {
 pub fn create_parser(
     redirects: Vec<ConfigLinkQuery<String>>,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-) -> NFA<(Vec<LinkToken>, Vec<QueryToken>)> {
-    NFA::any_of(
+) -> Result<NFA<(Vec<LinkToken>, Vec<QueryToken>)>, String> {
+    Ok(NFA::any_of(
         &(redirects
             .into_iter()
             // TODO: replace screw up suggestions
             .map(|c| {
                 // TODO: handle errors here
-                let sentence = parse_query(&c.query).unwrap();
-                let link = parse_link(&c.link).unwrap();
-                // TODO: check that substitutions exists
+                let sentence = parse_query(&c.query)?;
+                let link = parse_link(&c.link)?;
+                validate_query_with_link(&sentence, &c.query, &link, &c.link)?;
                 let c = ConfigLinkQuery {
                     query: c.query,
                     link,
@@ -74,10 +74,10 @@ pub fn create_parser(
                     });
                     prev = Some(word.clone())
                 }
-                NFA::chain(&parsers).with_payload_for_final_nodes(&(c.link, sentence))
+                Ok(NFA::chain(&parsers).with_payload_for_final_nodes(&(c.link, sentence)))
             })
-            .collect::<Vec<_>>()),
-    )
+            .collect::<Result<Vec<_>, String>>())?,
+    ))
 }
 
 pub struct ResolvedParsedOutput {
