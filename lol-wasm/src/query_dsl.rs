@@ -25,20 +25,20 @@ fn validate_braces(input: &str) -> Result<(), String> {
         }
     }
     if cnt != 0 {
-        Err(format!("Missing closing brace!"))?;
+        Err("Missing closing brace!".to_string())?;
     }
     Ok(())
 }
 
-fn split_by_braces<'a>(input: &'a str) -> Result<Vec<&'a str>, String> {
+fn split_by_braces(input: &str) -> Result<Vec<&str>, String> {
     validate_braces(input)?;
     let mut input = input;
     let mut output = vec![];
     loop {
-        if let Some(index) = input.find("{") {
+        if let Some(index) = input.find('{') {
             let (prefix, suffix) = input.split_at(index);
             output.push(prefix);
-            if let Some(mut index) = suffix.find("}") {
+            if let Some(mut index) = suffix.find('}') {
                 index += 1;
                 while !suffix.is_char_boundary(index) {
                     index += 1
@@ -47,7 +47,7 @@ fn split_by_braces<'a>(input: &'a str) -> Result<Vec<&'a str>, String> {
                 output.push(prefix);
                 input = suffix;
             } else {
-                Err(format!("Not matching parenthesis. This is impossible"))?;
+                Err("Not matching parenthesis. This is impossible".to_string())?;
             }
         } else {
             output.push(input);
@@ -57,13 +57,13 @@ fn split_by_braces<'a>(input: &'a str) -> Result<Vec<&'a str>, String> {
     Ok(output)
 }
 
-fn parse_braces<'a>(input: &'a str) -> Option<Vec<&'a str>> {
-    if input.starts_with("{") {
+fn parse_braces(input: &str) -> Option<Vec<&str>> {
+    if input.starts_with('{') {
         Some(
             input
-                .trim_start_matches("{")
-                .trim_end_matches("}")
-                .split(":")
+                .trim_start_matches('{')
+                .trim_end_matches('}')
+                .split(':')
                 .collect(),
         )
     } else {

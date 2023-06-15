@@ -83,10 +83,7 @@ impl<T> Node<T> {
 
     fn map<R, F: Fn(&T) -> R>(&self, f: &F) -> Node<R> {
         Node {
-            payload: match self.payload {
-                Some(ref p) => Some(f(p)),
-                None => None,
-            },
+            payload: self.payload.as_ref().map(f),
             is_final: self.is_final,
             normal_edges: self.normal_edges.clone(),
             regex_edges: self.regex_edges.clone(),
@@ -137,10 +134,7 @@ impl<T> Node<T> {
             .flat_map(|(len, hm)| {
                 if let Some(edges) = hm.get(&input[..*len]) {
                     let rest = input.split_at(*len).1;
-                    edges
-                        .into_iter()
-                        .map(|index| (*index, rest, 0., None))
-                        .collect()
+                    edges.iter().map(|index| (*index, rest, 0., None)).collect()
                 } else {
                     vec![]
                 }
@@ -203,7 +197,7 @@ impl<T> Node<T> {
             .collect()
     }
 
-    pub fn get_suggestions<'a>(&'a self) -> Vec<(&'a String, &'a Vec<NodeIndex>)> {
+    pub fn get_suggestions(&self) -> Vec<(&String, &Vec<NodeIndex>)> {
         let normal_edges = self.normal_edges.values().flat_map(|x| x.iter());
         let regex_edges = self.regex_edges.iter().map(|x| (&x.suggestion, &x.target));
         let substitution_edges = self
@@ -298,7 +292,7 @@ impl<T: Clone> NFA<T> {
             .map(|x| x.0)
             .collect::<Vec<_>>();
         let mut shift = ret.nodes.len();
-        for nfa in nfas[1..].into_iter() {
+        for nfa in nfas[1..].iter() {
             let root = shift + nfa.root;
             leafs.iter().for_each(|index| {
                 ret.nodes[*index].is_final = false;
@@ -326,7 +320,7 @@ impl<T: Clone> NFA<T> {
             root: 0,
         };
         let mut shift = ret.nodes.len();
-        for nfa in nfas.into_iter() {
+        for nfa in nfas.iter() {
             let root = shift + nfa.root;
             ret.nodes[0].add_normal_edge("".into(), root);
             for node in nfa.nodes.iter() {
@@ -403,6 +397,8 @@ impl NFA<()> {
     }
 }
 
+type ParserOutputTuple<'a, 'b, T> = (&'a Node<T>, &'b str, f64, Option<WithIdentifier<EdgeData>>);
+
 impl<T> NFA<T> {
     pub fn nothing() -> NFA<T> {
         NFA {
@@ -415,7 +411,7 @@ impl<T> NFA<T> {
         &'a self,
         node_self: &Node<T>,
         input: &'b str,
-    ) -> Vec<(&'a Node<T>, &'b str, f64, Option<WithIdentifier<EdgeData>>)> {
+    ) -> Vec<ParserOutputTuple<'a, 'b, T>> {
         node_self
             .get_matching_edges(input)
             .into_iter()
@@ -451,9 +447,9 @@ impl<T: std::fmt::Debug> NFA<T> {
             .collect()
     }
 
-    pub fn parse_full_and_suggest<'a, 'b>(
+    pub fn parse_full_and_suggest<'a>(
         &'a self,
-        input: &'b str,
+        input: &str,
     ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
         // TODO: collect payloads
         let mut state = VecDeque::from([(&self.nodes[self.root], input, 0., vec![])]);
@@ -490,15 +486,13 @@ impl<T: std::fmt::Debug> NFA<T> {
         let mut visited: HashSet<NodeIndex> = Default::default();
         let mut skip_suggesting_until = suggestion_states.len();
         while let Some((node, suggestion)) = suggestion_states.pop_front() {
-            if node.is_final && skip_suggesting_until <= 0 {
+            if node.is_final && skip_suggesting_until == 0 {
                 suggestions.push(Suggestion {
                     suggestion: format!("{}{}", input, suggestion.join("")),
                     payload: &node.payload,
                 })
             }
-            if skip_suggesting_until > 0 {
-                skip_suggesting_until -= 1;
-            }
+            skip_suggesting_until = skip_suggesting_until.saturating_sub(1);
             for (text, target_nodes) in node.get_suggestions() {
                 for target_node in target_nodes.iter().filter(|x| visited.insert(**x)) {
                     let mut suggestion = suggestion.clone();

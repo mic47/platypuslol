@@ -50,8 +50,8 @@ pub fn create_parser(
                         }
                     }
                     parsers.push(match word {
-                        QueryToken::Exact(ref word) => NFA::match_string(&word),
-                        QueryToken::Prefix(ref word) => NFA::match_non_empty_prefixes(&word),
+                        QueryToken::Exact(ref word) => NFA::match_string(word),
+                        QueryToken::Prefix(ref word) => NFA::match_non_empty_prefixes(word),
                         QueryToken::Regex(ref identifier, ref regex) => {
                             NFA::regex(identifier.clone(), regex.clone())
                         }
@@ -107,7 +107,7 @@ pub fn resolve_parsed_output(p: Parsed<Vec<LinkToken>>) -> (f64, String) {
                     if let Some(replacement) = matches.get(replacement) {
                         // TODO: we want to html escape this in better way. Probably in javascript
                         // even?
-                        replacement.clone().replace(" ", "+")
+                        replacement.clone().replace(' ', "+")
                     } else {
                         "ERROR".into()
                     }
