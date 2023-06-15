@@ -2,6 +2,12 @@ import init, {init_parser} from './wasm_lol/lol_wasm.js';
 
 var parser = null;
 
+function set_parser(config) {
+  parser = init_parser(config);
+	const default_suggestion = parser.suggest("");
+	chrome.storage.local.set({default_suggestion: default_suggestion});
+}
+
 init().then(() => {
   fetch(chrome.runtime.getURL('commands.json'))
     .then((resp) => resp.json())
@@ -9,7 +15,7 @@ init().then(() => {
     chrome.storage.sync.get(
       { config: JSON.stringify(defaultConfig) },
     ).then((items) => {
-      parser = init_parser(items.config);
+			set_parser(items.config);
     });
   });
 });
@@ -56,10 +62,8 @@ chrome.omnibox.onInputEntered.addListener((text) => {
 
 chrome.storage.onChanged.addListener(
   (changes, areaName) => {
-    console.log(changes);
-    console.log(areaName);
     if (areaName == "sync" && changes.config != undefined && changes.config.newValue != undefined) {
-      parser = init_parser(changes.config.newValue);
+			set_parser(changes.config.newValue);
     }
   }
 )

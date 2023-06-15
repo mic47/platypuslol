@@ -9,8 +9,8 @@
 - [x] Figure out how to handle state
 - [x] Figure out how to handle configuration
 - [x] ~Extension pages: conflict resolution~ -- canceled, no conflict resolution, just everything
-- [ ] Extension pages: list of all commands
-- [ ] Extension pages: configuration
+- [x] Extension pages: list of all commands
+- [x] Extension pages: configuration
 - [ ] Options validation
 - [ ] Fix suggestions behavior (return longer items)
 - [ ] Add more tests to all parser parts to document expectations / behavior of modules
@@ -19,3 +19,5 @@
 - [ ] Make it possible to load parser from external configured url.
 - [ ] Consider removing regex node for compile time weight (or not bundle it into wasm).
 - [ ] Remove unwraps, handle errors properly everywhere
+- [ ] Removal of duplicit suggestions in API, not in client
+- [ ] Foldable list of command for same type of suggestion (substitutions)
