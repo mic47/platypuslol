@@ -5,7 +5,7 @@
 - [x] Bundle WASM into extension
 - [x] Plug in the parser (with hardcoded config or something like that).
 - [x] Fix suggestion behavior -- return multiple suggestions for substitutions
-- [ ] Fix suggestion behavior -- return multipls suggestions in middle of substitution
+- [x] Fix suggestion behavior -- return multipls suggestions in middle of substitution
 - [ ] Figure out how to handle state, & configuration
 - [ ] Extension pages: conflict resolution
 - [ ] Extension pages: list of all commands

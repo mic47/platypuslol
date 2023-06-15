@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{parse_link, parse_query, LinkToken, QueryToken};
-use nfa::{EdgeData, Parsed, Trace, NFA};
+use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfigLinkQuery<L> {
@@ -86,10 +86,15 @@ pub struct ResolvedParsedOutput {
     pub description: String,
 }
 
-pub fn resolve_parsed_output(p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>) -> ResolvedParsedOutput {
+fn process_trace(
+    trace: Vec<Trace<&(Vec<LinkToken>, Vec<QueryToken>)>>,
+) -> (
+    HashMap<String, String>,
+    HashMap<String, HashMap<String, String>>,
+) {
     let mut matches: HashMap<String, String> = HashMap::default();
     let mut substitutions: HashMap<String, HashMap<String, String>> = HashMap::default();
-    for trace in p.trace.into_iter() {
+    for trace in trace.into_iter() {
         match trace {
             Trace::Edge(data) => {
                 match data.payload {
@@ -104,6 +109,11 @@ pub fn resolve_parsed_output(p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>) -> Re
             Trace::Node(_) => (),
         }
     }
+    (matches, substitutions)
+}
+
+pub fn resolve_parsed_output(p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>) -> ResolvedParsedOutput {
+    let (matches, substitutions) = process_trace(p.trace);
     ResolvedParsedOutput {
         score: p.score,
         link: p
@@ -132,32 +142,48 @@ pub fn resolve_parsed_output(p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>) -> Re
             })
             .collect::<Vec<_>>()
             .join(""),
-        description: p
-            .payload
-            .1
-            .iter()
-            .map(|x| match x {
-                QueryToken::Exact(data) => data.clone(),
-                QueryToken::Prefix(data) => data.clone(),
-                QueryToken::Regex(replacement, _) => {
-                    if let Some(replacement) = matches.get(replacement) {
-                        // TODO: we want to html escape this in better way. Probably in javascript
-                        // even?
-                        replacement.clone().replace(' ', "+")
-                    } else {
-                        "ERROR".into()
-                    }
-                }
-                QueryToken::Substitution(type_, _, subtype) => {
-                    if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype))
-                    {
-                        replacement.clone()
-                    } else {
-                        "ERROR".into()
-                    }
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" "),
+        description: process_suggestion(&matches, &substitutions, &p.payload.1),
     }
+}
+
+fn process_suggestion(
+    matches: &HashMap<String, String>,
+    substitutions: &HashMap<String, HashMap<String, String>>,
+    query: &[QueryToken],
+) -> String {
+    query
+        .iter()
+        .map(|x| match x {
+            QueryToken::Exact(data) => data.clone(),
+            QueryToken::Prefix(data) => data.clone(),
+            QueryToken::Regex(replacement, _) => {
+                if let Some(replacement) = matches.get(replacement) {
+                    // TODO: we want to html escape this in better way. Probably in javascript
+                    // even?
+                    replacement.clone().replace(' ', "+")
+                } else {
+                    "<query>".into()
+                }
+            }
+            QueryToken::Substitution(type_, _, subtype) => {
+                if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype)) {
+                    replacement.clone()
+                } else {
+                    format!("<{}>", type_)
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+pub fn resolve_suggestion_output(
+    suggestion: Suggestion<(Vec<LinkToken>, Vec<QueryToken>)>,
+) -> String {
+    let (matches, substitutions) = process_trace(suggestion.trace);
+    suggestion
+        .payload
+        .as_ref()
+        .map(|x| process_suggestion(&matches, &substitutions, &x.1))
+        .unwrap_or(suggestion.suggestion)
 }

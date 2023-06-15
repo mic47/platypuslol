@@ -3,8 +3,8 @@ use std::sync::RwLock;
 
 use nfa::NFA;
 use redirect::{
-    create_parser, resolve_parsed_output, ConfigLinkQuery, LinkToken, QueryToken,
-    ResolvedParsedOutput,
+    create_parser, resolve_parsed_output, resolve_suggestion_output, ConfigLinkQuery, LinkToken,
+    QueryToken, ResolvedParsedOutput,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -32,8 +32,10 @@ pub struct JsConfig {
     redirects: Vec<JsQueryLink>,
 }
 
+type ParserType = RwLock<HashMap<String, NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>;
+
 lazy_static::lazy_static! {
-  static ref PARSERS: RwLock<HashMap<String, NFA<(Vec<LinkToken>, Vec<QueryToken>)>>> = RwLock::new(Default::default());
+  static ref PARSERS: ParserType = RwLock::new(Default::default());
 }
 
 #[wasm_bindgen]
@@ -50,15 +52,16 @@ pub fn redirect(parser_name: &str, text: &str) -> Option<String> {
     let lock = PARSERS.read().unwrap();
     let parser = lock.get(parser_name).unwrap();
     let (parsed, _) = parser.parse_full_and_suggest(text);
-    for p in parsed.into_iter() {
+    if let Some(p) = parsed.into_iter().next() {
         let ResolvedParsedOutput {
             score: _,
             link,
             description: _,
         } = resolve_parsed_output(p);
-        return Some(link);
+        Some(link)
+    } else {
+        None
     }
-    None
 }
 
 #[wasm_bindgen]
@@ -86,9 +89,10 @@ pub fn suggest(parser_name: &str, text: &str) -> String {
         })
     }
     for s in suggestions.into_iter() {
+        let text = resolve_suggestion_output(s);
         output.push(Suggestion {
-            text: s.suggestion.clone(),
-            link: s.suggestion,
+            text: text.clone(),
+            link: text,
         })
     }
 

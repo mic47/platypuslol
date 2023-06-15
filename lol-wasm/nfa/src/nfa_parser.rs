@@ -196,13 +196,29 @@ impl<T> Node<T> {
             .collect()
     }
 
-    pub fn get_suggestions(&self) -> Vec<(&String, &Vec<NodeIndex>)> {
-        let normal_edges = self.normal_edges.values().flat_map(|x| x.iter());
-        let regex_edges = self.regex_edges.iter().map(|x| (&x.suggestion, &x.target));
-        let substitution_edges = self
-            .substitution_edges
+    #[allow(clippy::type_complexity)]
+    pub fn get_suggestions(&self) -> Vec<(&String, &Vec<NodeIndex>, Option<Trace<&T>>)> {
+        let normal_edges = self
+            .normal_edges
+            .values()
+            .flat_map(|x| x.iter())
+            .map(|(a, b)| (a, b, None));
+        let regex_edges = self
+            .regex_edges
             .iter()
-            .flat_map(|x| x.needles.iter().map(|(needle, _)| (needle, &x.target)));
+            .map(|x| (&x.suggestion, &x.target, None)); // TODO?
+        let substitution_edges = self.substitution_edges.iter().flat_map(|x| {
+            x.needles.iter().map(|(needle, subst)| {
+                (
+                    needle,
+                    &x.target,
+                    Some(Trace::Edge(WithIdentifier {
+                        identifier: x.identifier.clone(),
+                        payload: EdgeData::Substitution(subst.clone()),
+                    })),
+                )
+            })
+        });
         normal_edges
             .chain(regex_edges)
             .chain(substitution_edges)
@@ -434,6 +450,7 @@ pub struct Parsed<'a, T> {
 pub struct Suggestion<'a, T> {
     pub payload: &'a Option<T>,
     pub suggestion: String,
+    pub trace: Vec<Trace<&'a T>>,
 }
 
 impl<T: std::fmt::Debug> NFA<T> {
@@ -451,10 +468,10 @@ impl<T: std::fmt::Debug> NFA<T> {
         // TODO: collect payloads
         let mut state = VecDeque::from([(&self.nodes[self.root], input, 0., vec![])]);
         let mut output = vec![];
-        let mut suggestion_states: VecDeque<(_, Vec<&str>)> = VecDeque::from([]);
+        let mut suggestion_states: VecDeque<(_, Vec<&str>, Vec<_>)> = VecDeque::from([]);
         while let Some((node, string, score, mut payloads)) = state.pop_front() {
             if string.is_empty() {
-                suggestion_states.push_back((node, vec![]))
+                suggestion_states.push_back((node, vec![], payloads.clone()))
             }
             if let Some(ref payload) = node.payload {
                 payloads.push(Trace::Node(payload));
@@ -482,21 +499,31 @@ impl<T: std::fmt::Debug> NFA<T> {
         let mut suggestions = vec![];
         let mut visited: HashSet<NodeIndex> = Default::default();
         let mut skip_suggesting_until = suggestion_states.len();
-        while let Some((node, suggestion)) = suggestion_states.pop_front() {
+        while let Some((node, suggestion, trace)) = suggestion_states.pop_front() {
             if node.is_final && skip_suggesting_until == 0 {
                 suggestions.push(Suggestion {
                     suggestion: format!("{}{}", input, suggestion.join("")),
                     payload: &node.payload,
+                    trace: trace.clone(),
                 })
             }
             skip_suggesting_until = skip_suggesting_until.saturating_sub(1);
             let mut to_visit: HashSet<NodeIndex> = Default::default();
-            for (text, target_nodes) in node.get_suggestions() {
+            for (text, target_nodes, node_trace) in node.get_suggestions() {
                 for target_node in target_nodes.iter().filter(|x| !visited.contains(*x)) {
+                    let trace = {
+                        if let Some(ref node_trace) = node_trace {
+                            let mut trace = trace.clone();
+                            trace.push(node_trace.clone());
+                            trace
+                        } else {
+                            trace.clone()
+                        }
+                    };
                     to_visit.insert(*target_node);
                     let mut suggestion = suggestion.clone();
                     suggestion.push(text);
-                    suggestion_states.push_back((&self.nodes[*target_node], suggestion))
+                    suggestion_states.push_back((&self.nodes[*target_node], suggestion, trace))
                 }
             }
             visited.extend(to_visit);

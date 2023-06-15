@@ -130,6 +130,14 @@ chrome.omnibox.onInputEntered.addListener((text) => {
   console.log("On input entered", text);
   let link = redirect("parser", text);
   //const newURL = 'https://www.google.com/search?q=' + encodeURIComponent(text);
-  chrome.tabs.create({ url: encodeURI(link) });
+
+  let queryOptions = { active: true, lastFocusedWindow: true };
+  chrome.tabs.query(queryOptions).then(([tab]) => {
+    if (tab != undefined) {
+      chrome.tabs.update(tab.tabId, { url: encodeURI(link) });
+    } else {
+      chrome.tabs.create({ url: encodeURI(link) });
+    }
+  });
 });
 
