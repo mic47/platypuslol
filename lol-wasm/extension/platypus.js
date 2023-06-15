@@ -118,7 +118,7 @@ chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
   for (var i = 0; i < suggestions.length ; i++) {
     let sug = suggestions[i];
     output.push({
-      content: escapeHTML(sug["text"]),
+      content: sug["text"],
       deletable: false,
       description: escapeHTML(sug["link"]),
     });

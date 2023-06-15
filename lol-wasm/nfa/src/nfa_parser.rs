@@ -29,7 +29,6 @@ pub struct RegExEdge {
 #[derive(Clone, Debug)]
 pub struct SubstitutionEdge {
     needles: Vec<(String, HashMap<String, String>)>,
-    suggestion: String,
     target: Vec<NodeIndex>,
     identifier: String,
 }
@@ -203,7 +202,7 @@ impl<T> Node<T> {
         let substitution_edges = self
             .substitution_edges
             .iter()
-            .map(|x| (&x.suggestion, &x.target));
+            .flat_map(|x| x.needles.iter().map(|(needle, _)| (needle, &x.target)));
         normal_edges
             .chain(regex_edges)
             .chain(substitution_edges)
@@ -243,7 +242,6 @@ impl<T: Clone> Node<T> {
                 .iter()
                 .map(|x| SubstitutionEdge {
                     needles: x.needles.clone(),
-                    suggestion: x.suggestion.clone(),
                     target: x.target.iter().map(|x| x + shift).collect(),
                     identifier: x.identifier.clone(),
                 })
@@ -386,7 +384,6 @@ impl NFA<()> {
     ) -> NFA<()> {
         let nodes = vec![
             Node::default().with_substitution_edge(SubstitutionEdge {
-                suggestion: format!("<{}>", identifier),
                 identifier,
                 target: vec![1],
                 needles,
@@ -493,13 +490,16 @@ impl<T: std::fmt::Debug> NFA<T> {
                 })
             }
             skip_suggesting_until = skip_suggesting_until.saturating_sub(1);
+            let mut to_visit: HashSet<NodeIndex> = Default::default();
             for (text, target_nodes) in node.get_suggestions() {
-                for target_node in target_nodes.iter().filter(|x| visited.insert(**x)) {
+                for target_node in target_nodes.iter().filter(|x| !visited.contains(*x)) {
+                    to_visit.insert(*target_node);
                     let mut suggestion = suggestion.clone();
                     suggestion.push(text);
                     suggestion_states.push_back((&self.nodes[*target_node], suggestion))
                 }
             }
+            visited.extend(to_visit);
         }
 
         let mut output: Vec<_> = output
