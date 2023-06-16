@@ -6,5 +6,7 @@ ci:
 
 run:
 	cargo run --bin tool -- --link-config extension/commands.json --query "create google rawg"
-suggest:
+run-suggest:
 	cargo run --bin tool -- --link-config extension/commands.json --query "cr"
+run-server:
+	 cargo run --bin server -- --link-config extension/commands.json

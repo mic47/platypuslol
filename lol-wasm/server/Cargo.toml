@@ -1,0 +1,16 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+html-builder.workspace = true
+nfa.workspace = true
+redirect.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+hyper.workspace = true
+tokio.workspace = true
+clap.workspace = true
+url.workspace = true
+lazy_static.workspace = true
