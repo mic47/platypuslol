@@ -31,6 +31,7 @@ install: FORCE release
 	if [ ! -f "${LOCAL_COMMANDS}" ] ; then cp extension/commands.json ${LOCAL_COMMANDS} ; fi
 	cat scripts/platypus-lol.service | envsubst > ${LOCAL_SYSTEMD}/platypus-lol.service
 	systemctl --user daemon-reload
+	systemctl --user enable platypus-lol
 	systemctl --user start platypus-lol
 	systemctl --user status platypus-lol
 
@@ -42,5 +43,8 @@ start: FORCE
 
 start: FORCE
 	systemctl --user restart platypus-lol
+
+logs: FORCE
+	 journalctl --user -u platypus-lol.service
 
 FORCE:

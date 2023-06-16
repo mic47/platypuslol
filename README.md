@@ -10,11 +10,12 @@ Assuming you have rust installed, simply run
 make install
 ```
 
-It will install everything for you, and run the service (on linux). See Makefile for more details.
+It will install everything for you, and run the service using systemd on linux. See Makefile for more details.
+If you are on mac, you are on your own, but please share how you did it, I am happy to include it here.
 
 ## Extension
 
-To make extension, run `make wasm`, and then load it upacked into chrome.
+To make extension, run `make wasm`, and then load it unpacked into chrome. Currently it's not in chrome store (work in progress).
 
 ## TODO
 
@@ -42,6 +43,7 @@ To make extension, run `make wasm`, and then load it upacked into chrome.
 - [x] Check equivalency with haskell and delete haskell
 - [x] Limit size for returning amount of suggestions to some reasonable number (20)
 - [x] Docker / systemd setup with cron-like update of config repo
+- [ ] When doing something wrong, substitute query for anything? -- parser do not allow it I think
 - [ ] Figure out why reloading of config does not work.
 - [ ] Default to google or other configurable search engine
 - [ ] Require space between suggestions, but not before / after if it's fixed word.

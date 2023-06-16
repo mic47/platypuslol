@@ -25,6 +25,18 @@
       "link": "https://mail.google.com/mail/u/0"
     },
     {
+      "query": "list",
+      "link": "list"
+    },
+    {
+      "query": "install",
+      "link": "install"
+    },
+    {
+      "query": "google {query:query}",
+      "link": "https://www.google.com/search?q={query}"
+    },
+    {
       "query": "search mail {query}",
       "link": "https://mail.google.com/mail/u/0/#search/{query}"
     },

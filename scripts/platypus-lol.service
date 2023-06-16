@@ -2,5 +2,8 @@
 Description=Platypus Lol! Smart redirect service.
 After=network.target
 
+[Install]
+WantedBy=default.target
+
 [Service]
 ExecStart=${HOME}/.local/bin/platypus-lol --link-config ${HOME}/.config/platypus-lol/commands.json --port 3047
