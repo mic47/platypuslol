@@ -88,14 +88,8 @@ impl QueryToken {
         Ok(match tokens {
             [] => Err("empty brace parameters")?,
             [item, "exact"] => Self::Exact((*item).into()),
-            [item, "word"] => Self::Regex(
-                (*item).into(),
-                Regex::new(r"\w+").map_err(|x| x.to_string())?,
-            ),
-            [item] | [item, "query"] => Self::Regex(
-                (*item).into(),
-                Regex::new(r".+").map_err(|x| x.to_string())?,
-            ),
+            [item, "word"] => Self::Regex((*item).into(), Regex::new(r"\w+")?),
+            [item] | [item, "query"] => Self::Regex((*item).into(), Regex::new(r".+")?),
             [item, "subst", type_, subtype] => Self::Substitution(
                 if item.is_empty() {
                     (*type_).into()

@@ -11,6 +11,7 @@ pub struct ConfigLinkQuery<L> {
     pub link: L,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn create_parser(
     redirects: Vec<ConfigLinkQuery<String>>,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
@@ -80,6 +81,7 @@ pub fn create_parser(
     ))
 }
 
+#[derive(Serialize)]
 pub struct ResolvedParsedOutput {
     pub score: f64,
     pub link: String,
@@ -182,7 +184,7 @@ fn process_suggestion(
         .join(" ")
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize)]
 pub struct ResolvedSuggestionOutput {
     pub link: Option<String>,
     pub description: String,
