@@ -16,9 +16,9 @@
 - [x] Fix suggestions behavior (return longer items)
 - [x] Consider removing regex node for compile time weight (or not bundle it into wasm).
 - [ ] Removal of duplicit suggestions in API, not in client
-- [ ] Make it as suggestion api server.
-- [ ] Make list of commands page.
-- [ ] Make configuration page.
+- [x] Make it as suggestion api server.
+- [x] Make list of commands page.
+- [-] ~Make configuration page.~ Not necessary
 - [ ] Make hot reloading of config file.
 - [ ] Docker / systemd setup with cron-like update of config repo
 - [ ] Default to google or other configurable search engine

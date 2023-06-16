@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow.workspace = true
 html-builder.workspace = true
 nfa.workspace = true
 redirect.workspace = true

@@ -20,6 +20,7 @@ tool = { path = "tool" }
 wasm_lol = { path = "wasm_lol" }
 server = { path = "server" }
 
+anyhow = "1.0.71"
 clap = { version = "4.3.3", features = ["derive"]}
 html-builder = "0.5.1"
 hyper = { version = "0.14", features = ["full"]}

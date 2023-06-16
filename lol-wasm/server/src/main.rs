@@ -5,8 +5,8 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use anyhow::Context;
 use html_builder::{Buffer, Html5};
-use hyper::header::InvalidHeaderValue;
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
@@ -47,7 +47,7 @@ struct Cli {
 async fn debug(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
-) -> Response<Body> {
+) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     if let Some(query) = p.get("q") {
         let (parsed, suggested) = parser.parse_full_and_suggest(query);
@@ -57,17 +57,17 @@ async fn debug(
             .map(resolve_suggestion_output)
             .collect();
         return to_string_response(
-            serde_json::to_value((parsed, suggested)).unwrap(),
+            serde_json::to_value((parsed, suggested)).context("Unable to serialize to json")?,
             ContentType::Json,
         );
     }
-    not_found()
+    Ok(not_found())
 }
 
 async fn suggest(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
-) -> Response<Body> {
+) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     if let Some(query) = p.get("q") {
         let (parsed, suggested) = parser.parse_full_and_suggest(query);
@@ -94,11 +94,11 @@ async fn suggest(
         }
         let response =
             serde_json::to_value((query, suggested_queries, suggested_texts, suggested_urls))
-                .unwrap();
+                .context("Unable to serialize suggestions")?;
         println!("{:?}", response);
         return to_string_response(response, ContentType::SuggestionsJson);
     }
-    not_found()
+    Ok(not_found())
 }
 
 fn query_params(req: &Request<Body>) -> HashMap<String, String> {
@@ -115,7 +115,7 @@ fn query_params(req: &Request<Body>) -> HashMap<String, String> {
 async fn redirect(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
-) -> Response<Body> {
+) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     if let Some(query) = p.get("q") {
         let (parsed, _) = parser.parse_full_and_suggest(query);
@@ -130,7 +130,7 @@ async fn redirect(
 async fn list(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
-) -> Response<Body> {
+) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     let (used_query, (parsed, suggested)) = p
         .get("q")
@@ -158,16 +158,15 @@ async fn list(
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
-    writeln!(html.head().title(), "List of platypus lol commands").unwrap();
+    writeln!(html.head().title(), "List of platypus lol commands")?;
     if let Some(used_query) = used_query {
         writeln!(
             html.body().h1(),
             "List of Commands for Query '{}'",
             used_query
-        )
-        .unwrap();
+        )?;
     } else {
-        writeln!(html.body().h1(), "List of All Commands").unwrap();
+        writeln!(html.body().h1(), "List of All Commands")?;
     }
     let mut body = html.body();
     let mut list = body.ul();
@@ -178,10 +177,9 @@ async fn list(
                 list.li().a().attr(&format!("href='{}'", link)),
                 "{}",
                 description,
-            )
-            .unwrap();
+            )?;
         } else {
-            writeln!(list.li(), "{}", description,).unwrap();
+            writeln!(list.li(), "{}", description,)?;
         }
     }
     to_string_response(buf.finish(), ContentType::Html)
@@ -195,29 +193,30 @@ async fn route(
     let method = req.method();
     let path = req.uri().path();
     let path = path.strip_suffix('/').unwrap_or(path);
-    match (method, path) {
-        (&Method::GET, "") | (&Method::GET, "/install") => Ok(templated_string_response(
+    Ok((match (method, path) {
+        (&Method::GET, "") | (&Method::GET, "/install") => templated_string_response(
             INSTALL_INSTRUCTIONS.into(),
             &template_variables,
             ContentType::Html,
-        )),
-        (&Method::GET, "/install/opensearch.xml") => Ok(templated_string_response(
+        ),
+        (&Method::GET, "/install/opensearch.xml") => templated_string_response(
             OPENSEARCH.into(),
             &template_variables,
             ContentType::OpenSearchDescription,
-        )),
-        (&Method::GET, "/list") => Ok(list(req, parser).await),
-        (&Method::GET, "/debug") => Ok(debug(req, parser).await),
-        (&Method::GET, "/redirect") => Ok(redirect(req, parser).await),
-        (&Method::GET, "/suggest") => Ok(suggest(req, parser).await),
+        ),
+        (&Method::GET, "/list") => list(req, parser).await,
+        (&Method::GET, "/debug") => debug(req, parser).await,
+        (&Method::GET, "/redirect") => redirect(req, parser).await,
+        (&Method::GET, "/suggest") => suggest(req, parser).await,
         (_, path) => {
             if let Some(icon) = ICONS.get(&path) {
-                Ok(bytes_response(icon.clone(), ContentType::Png))
+                bytes_response(icon.clone(), ContentType::Png)
             } else {
                 Ok(not_found())
             }
         }
-    }
+    })
+    .unwrap_or_else(internal_server_error))
 }
 
 enum ContentType {
@@ -229,7 +228,7 @@ enum ContentType {
 }
 
 impl TryFrom<ContentType> for HeaderValue {
-    type Error = InvalidHeaderValue;
+    type Error = anyhow::Error;
 
     fn try_from(value: ContentType) -> Result<Self, Self::Error> {
         HeaderValue::from_str(match value {
@@ -239,80 +238,90 @@ impl TryFrom<ContentType> for HeaderValue {
             ContentType::OpenSearchDescription => "application/opensearchdescription+xml",
             ContentType::Png => "image/png",
         })
+        .context("Unable to convert redirect to location")
     }
 }
 
-fn to_string_response<T: ToString>(value: T, content_type: ContentType) -> Response<Body> {
+fn to_string_response<T: ToString>(
+    value: T,
+    content_type: ContentType,
+) -> anyhow::Result<Response<Body>> {
     let (mut parts, _) = Response::<Body>::default().into_parts();
     parts.headers.insert(
         hyper::header::CONTENT_TYPE,
-        HeaderValue::try_from(content_type).unwrap(),
+        HeaderValue::try_from(content_type)?,
     );
     let body = Body::from(value.to_string());
-    Response::from_parts(parts, body)
+    Ok(Response::from_parts(parts, body))
 }
 
-fn bytes_response(value: Vec<u8>, content_type: ContentType) -> Response<Body> {
+fn bytes_response(value: Vec<u8>, content_type: ContentType) -> anyhow::Result<Response<Body>> {
     let (mut parts, _) = Response::<Body>::default().into_parts();
     parts.headers.insert(
         hyper::header::CONTENT_TYPE,
-        HeaderValue::try_from(content_type).unwrap(),
+        HeaderValue::try_from(content_type)?,
     );
     let body = Body::from(value);
-    Response::from_parts(parts, body)
+    Ok(Response::from_parts(parts, body))
 }
 
 fn templated_string_response(
     value: String,
     replacements: &HashMap<String, String>,
     content_type: ContentType,
-) -> Response<Body> {
+) -> anyhow::Result<Response<Body>> {
     let (mut parts, _) = Response::<Body>::default().into_parts();
     parts.headers.insert(
         hyper::header::CONTENT_TYPE,
-        HeaderValue::try_from(content_type).unwrap(),
+        HeaderValue::try_from(content_type)?,
     );
     let mut value = value;
     for (k, v) in replacements {
         value = value.replace(k, v);
     }
     let body = Body::from(value);
-    Response::from_parts(parts, body)
+    Ok(Response::from_parts(parts, body))
 }
 
-fn redirect_response(uri: &str) -> Response<Body> {
+fn redirect_response(uri: &str) -> anyhow::Result<Response<Body>> {
     let (mut parts, body) = Response::<Body>::default().into_parts();
     parts
         .headers
-        .insert(hyper::header::LOCATION, HeaderValue::from_str(uri).unwrap());
+        .insert(hyper::header::LOCATION, HeaderValue::from_str(uri)?);
     parts.status = StatusCode::FOUND;
-    Response::from_parts(parts, body)
+    Ok(Response::from_parts(parts, body))
 }
 
 fn not_found() -> Response<Body> {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(Body::empty())
-        .unwrap()
+    let (mut parts, body) = Response::<Body>::default().into_parts();
+    parts.status = StatusCode::NOT_FOUND;
+    Response::from_parts(parts, body)
+}
+
+fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
+    let (mut parts, _) = Response::<Body>::default().into_parts();
+    parts.status = StatusCode::INTERNAL_SERVER_ERROR;
+    let body = Body::from(error.to_string());
+    Response::from_parts(parts, body)
 }
 
 #[tokio::main]
-async fn main() {
-    // We'll bind to 127.0.0.1:3000
-
+async fn main() -> anyhow::Result<()> {
     let cli = <Cli as clap::Parser>::parse();
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
-
     // TODO: better tool
-    let config: Config =
-        serde_json::from_str(&std::fs::read_to_string(cli.link_config).unwrap()).unwrap();
-    let parser = Arc::new(create_parser(config.redirects, config.substitutions).unwrap());
+    let config: Config = serde_json::from_str(
+        &std::fs::read_to_string(cli.link_config.clone())
+            .with_context(|| format!("Unable to find config file {:?}", cli.link_config))?,
+    )
+    .context("Unable to parse config.")?;
+    let parser = Arc::new(
+        create_parser(config.redirects, config.substitutions)
+            .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))?,
+    );
     let default_server = format!("localhost:{}", cli.port);
     let default_protocol = "http://";
 
-    // A `Service` is needed for every connection, so this
-    // creates one from our `hello_world` function.
     let make_svc = make_service_fn(move |_conn| {
         let parser = parser.clone();
         let default_server = default_server.clone();
@@ -324,8 +333,8 @@ async fn main() {
                     "{default_protocol}{}",
                     req.headers()
                         .get("Host")
-                        .map(|x| x.to_str().unwrap().into())
-                        .unwrap_or(default_server)
+                        .and_then(|x| x.to_str().ok())
+                        .unwrap_or(&default_server)
                 );
                 let template_variables = HashMap::from([("{server}".into(), server_uri)]);
                 route(req, parser, template_variables)
@@ -333,10 +342,11 @@ async fn main() {
         }
     });
 
+    let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
     let server = Server::bind(&addr).serve(make_svc);
 
-    // Run this server for... forever!
     if let Err(e) = server.await {
         eprintln!("server error: {}", e);
     }
+    Ok(())
 }
