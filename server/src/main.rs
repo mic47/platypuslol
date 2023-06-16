@@ -45,7 +45,7 @@ struct Cli {
     pub port: u16,
 }
 
-async fn debug(
+fn debug(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
 ) -> anyhow::Result<Response<Body>> {
@@ -65,7 +65,7 @@ async fn debug(
     Ok(not_found())
 }
 
-async fn suggest(
+fn suggest(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
 ) -> anyhow::Result<Response<Body>> {
@@ -121,7 +121,7 @@ fn query_params(req: &Request<Body>) -> HashMap<String, String> {
         .unwrap_or_else(HashMap::new)
 }
 
-async fn redirect(
+fn redirect(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
 ) -> anyhow::Result<Response<Body>> {
@@ -133,10 +133,10 @@ async fn redirect(
         }
     }
     // TODO: default if you can't find any suggestion?
-    list(req, parser).await
+    list(req, parser)
 }
 
-async fn list(
+fn list(
     req: Request<Body>,
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
 ) -> anyhow::Result<Response<Body>> {
@@ -195,7 +195,7 @@ async fn list(
 }
 
 #[allow(clippy::type_complexity)]
-async fn route(
+fn route(
     req: Request<Body>,
     parser: Arc<RwLock<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>>,
     template_variables: HashMap<String, String>,
@@ -215,10 +215,10 @@ async fn route(
             &template_variables,
             ContentType::OpenSearchDescription,
         ),
-        (&Method::GET, "/list") => list(req, parser).await,
-        (&Method::GET, "/debug") => debug(req, parser).await,
-        (&Method::GET, "/redirect") => redirect(req, parser).await,
-        (&Method::GET, "/suggest") => suggest(req, parser).await,
+        (&Method::GET, "/list") => list(req, parser),
+        (&Method::GET, "/debug") => debug(req, parser),
+        (&Method::GET, "/redirect") => redirect(req, parser),
+        (&Method::GET, "/suggest") => suggest(req, parser),
         (_, path) => {
             if let Some(icon) = ICONS.get(&path) {
                 bytes_response(icon.clone(), ContentType::Png)
@@ -395,7 +395,7 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap_or(&default_server)
                 );
                 let template_variables = HashMap::from([("{server}".into(), server_uri)]);
-                route(req, parser, template_variables)
+                async { route(req, parser, template_variables) }
             }))
         }
     });
