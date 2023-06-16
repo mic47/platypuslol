@@ -52,3 +52,4 @@ To make extension, run `make wasm`, and then load it upacked into chrome.
 - [ ] Add more tests to all parser parts to document expectations / behavior of modules
 - [ ] Add better parser error handling -- more useful errors
 - [ ] Foldable list of command for same type of suggestion (substitutions)
+- [ ] Go over code, remove unnecessary things / dependencies (some libraries are heavy)
