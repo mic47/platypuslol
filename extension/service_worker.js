@@ -35,7 +35,7 @@ chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
 	console.log(sug);
   let suggestions = JSON.parse(sug);
   var output = [];
-  for (var i = 0; i < suggestions.length ; i++) {
+  for (var i = 0; i < Math.min(20, suggestions.length) ; i++) {
     let sug = suggestions[i];
     output.push({
       content: sug["text"],

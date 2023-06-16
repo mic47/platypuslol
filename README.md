@@ -26,7 +26,7 @@ Clone of bunny1 (or facebooks bunnylol) in Rust. Works as local server, or brows
 - [x] Make hot reloading of config file.
 - [x] Rename binary
 - [x] Check equivalency with haskell and delete haskell
-- [ ] Limit size for returning amount of suggestions to some reasonable number (20)
+- [x] Limit size for returning amount of suggestions to some reasonable number (20)
 - [ ] Docker / systemd setup with cron-like update of config repo
 - [ ] Default to google or other configurable search engine
 - [ ] Require space between suggestions, but not before / after if it's fixed word.

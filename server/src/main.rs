@@ -70,6 +70,7 @@ async fn suggest(
     parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
 ) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
+    let mut suggestions_left: i32 = 20; // TODO: configure
     if let Some(query) = p.get("q") {
         let (parsed, suggested) = parser.parse_full_and_suggest(query);
         let mut suggested_queries: Vec<String> = vec![];
@@ -79,6 +80,10 @@ async fn suggest(
             suggested_texts.push(format!("{} => {}", p.description, p.link));
             suggested_queries.push(p.description);
             suggested_urls.push(p.link);
+            suggestions_left -= 1;
+            if suggestions_left <= 0 {
+                break;
+            }
         }
         let mut visited: HashSet<_> = HashSet::default();
         for s in suggested.into_iter().map(resolve_suggestion_output) {
@@ -92,11 +97,14 @@ async fn suggest(
             ));
             suggested_queries.push(s.description);
             suggested_urls.push(s.link.unwrap_or("???".into()));
+            suggestions_left -= 1;
+            if suggestions_left <= 0 {
+                break;
+            }
         }
         let response =
             serde_json::to_value((query, suggested_queries, suggested_texts, suggested_urls))
                 .context("Unable to serialize suggestions")?;
-        println!("{:?}", response);
         return to_string_response(response, ContentType::SuggestionsJson);
     }
     Ok(not_found())
