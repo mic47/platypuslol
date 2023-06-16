@@ -41,7 +41,7 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     pub link_config: PathBuf,
 
-    #[arg(short, long, value_name = "PORT", default_value = "3000")]
+    #[arg(short, long, value_name = "PORT", default_value = "3047")]
     pub port: u16,
 }
 

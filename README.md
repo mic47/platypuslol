@@ -2,6 +2,20 @@
 
 Clone of bunny1 (or facebooks bunnylol) in Rust. Works as local server, or browser extension (currently chrome only). Use at your own risk (for now).
 
+## Instructions
+
+Assuming you have rust installed, simply run
+
+```bash
+make install
+```
+
+It will install everything for you, and run the service (on linux). See Makefile for more details.
+
+## Extension
+
+To make extension, run `make wasm`, and then load it upacked into chrome.
+
 ## TODO
 
 - [x] Split into separate crates: nfa parser, redirect query, command line tool, wasm module
@@ -27,7 +41,8 @@ Clone of bunny1 (or facebooks bunnylol) in Rust. Works as local server, or brows
 - [x] Rename binary
 - [x] Check equivalency with haskell and delete haskell
 - [x] Limit size for returning amount of suggestions to some reasonable number (20)
-- [ ] Docker / systemd setup with cron-like update of config repo
+- [x] Docker / systemd setup with cron-like update of config repo
+- [ ] Figure out why reloading of config does not work.
 - [ ] Default to google or other configurable search engine
 - [ ] Require space between suggestions, but not before / after if it's fixed word.
 - [ ] Make default and extra config (multiple config files possible)
