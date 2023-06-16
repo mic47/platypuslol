@@ -10,7 +10,7 @@ use html_builder::{Buffer, Html5};
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use notify::{Event, RecursiveMode, Watcher, INotifyWatcher};
+use notify::{Event, INotifyWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 
 use nfa::NFA;
