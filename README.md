@@ -13,6 +13,9 @@ make install
 It will install everything for you, and run the service using systemd on linux. See Makefile for more details.
 If you are on mac, you are on your own, but please share how you did it, I am happy to include it here.
 
+After that, visit [https://localhost:3047/install](https://localhost:3047/install) in your browser, follow instructions and profit.
+You can edit then `~/.config/platypus-lol/commands.conf` to your liking.
+
 ## Extension
 
 To make extension, run `make wasm`, and then load it unpacked into chrome. Currently it's not in chrome store (work in progress).
