@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use nfa::NFA;
 use redirect::{
@@ -51,12 +51,15 @@ impl ExtensionParser {
                 link,
             })
         }
+        let mut visited: HashSet<_> = HashSet::default();
         for s in suggestions.into_iter() {
             let s = resolve_suggestion_output(s);
-            output.push(Suggestion {
-                text: s.description,
-                link: s.link.unwrap_or(Default::default()),
-            })
+            if visited.insert(s.clone()) {
+                output.push(Suggestion {
+                    text: s.description,
+                    link: s.link.unwrap_or(Default::default()),
+                })
+            }
         }
         serde_json::to_string(&output).map_err(|x| x.to_string())
     }
