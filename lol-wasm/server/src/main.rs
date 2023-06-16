@@ -2,14 +2,15 @@ use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::fmt::Write;
 use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 use anyhow::Context;
 use html_builder::{Buffer, Html5};
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use notify::{Event, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 
 use nfa::NFA;
@@ -35,7 +36,7 @@ lazy_static::lazy_static! {
     ]);
 }
 
-#[derive(clap::Parser)]
+#[derive(Clone, Debug, clap::Parser)]
 struct Cli {
     #[arg(short, long, value_name = "FILE")]
     pub link_config: PathBuf,
@@ -185,14 +186,16 @@ async fn list(
     to_string_response(buf.finish(), ContentType::Html)
 }
 
+#[allow(clippy::type_complexity)]
 async fn route(
     req: Request<Body>,
-    parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
+    parser: Arc<RwLock<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>>,
     template_variables: HashMap<String, String>,
 ) -> Result<Response<Body>, Infallible> {
     let method = req.method();
     let path = req.uri().path();
     let path = path.strip_suffix('/').unwrap_or(path);
+    let parser: Arc<NFA<_>> = { parser.read().unwrap().clone() };
     Ok((match (method, path) {
         (&Method::GET, "") | (&Method::GET, "/install") => templated_string_response(
             INSTALL_INSTRUCTIONS.into(),
@@ -305,20 +308,67 @@ fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
     Response::from_parts(parts, body)
 }
 
+#[allow(clippy::type_complexity)]
+fn load_parser(path: &Path) -> anyhow::Result<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>> {
+    // TODO: better tool
+    let config: Config = serde_json::from_str(
+        &std::fs::read_to_string(path)
+            .with_context(|| format!("Unable to find config file {:?}", path))?,
+    )
+    .context("Unable to parse config.")?;
+    Ok(Arc::new(
+        create_parser(config.redirects, config.substitutions)
+            .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))?,
+    ))
+}
+
+#[allow(clippy::type_complexity)]
+fn config_watcher(
+    path: PathBuf,
+    parser: Arc<RwLock<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>>,
+) -> anyhow::Result<()> {
+    let watcher_path = path.clone();
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
+        let path = watcher_path.clone();
+        match res {
+            Ok(event) => {
+                if event
+                    .paths
+                    .iter()
+                    .any(|x| path.file_name().map(|p| x.ends_with(p)).unwrap_or(true))
+                {
+                    let new_parser = load_parser(&path);
+                    match new_parser {
+                        Ok(new_parser) => {
+                            let mut parser = parser.write().unwrap();
+                            *parser = new_parser;
+                            println!("Config is reloaded {:?}", &path);
+                        }
+                        Err(err) => {
+                            println!("Unable to load config: {err}");
+                        }
+                    };
+                }
+            }
+            Err(e) => println!("watch error: {:?}", e),
+        }
+    })?;
+
+    // Need to watch parent directory, as editors might remove this file and again add it, which
+    // confuses watcher.
+    let parent = path.parent().unwrap_or(&path);
+    watcher
+        .watch(parent, RecursiveMode::Recursive)
+        .context("Unable to watch config file")
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = <Cli as clap::Parser>::parse();
 
-    // TODO: better tool
-    let config: Config = serde_json::from_str(
-        &std::fs::read_to_string(cli.link_config.clone())
-            .with_context(|| format!("Unable to find config file {:?}", cli.link_config))?,
-    )
-    .context("Unable to parse config.")?;
-    let parser = Arc::new(
-        create_parser(config.redirects, config.substitutions)
-            .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))?,
-    );
+    let parser = Arc::new(RwLock::new(load_parser(&cli.link_config)?));
+
+    config_watcher(cli.link_config.clone(), parser.clone())?;
     let default_server = format!("localhost:{}", cli.port);
     let default_protocol = "http://";
 

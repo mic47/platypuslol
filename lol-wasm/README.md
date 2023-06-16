@@ -19,9 +19,11 @@
 - [x] Make it as suggestion api server.
 - [x] Make list of commands page.
 - [-] ~Make configuration page.~ Not necessary
-- [ ] Make hot reloading of config file.
+- [x] Make hot reloading of config file.
 - [ ] Docker / systemd setup with cron-like update of config repo
 - [ ] Default to google or other configurable search engine
+- [ ] Make default and extra config (multiple config files possible)
+- [ ] Check for html escapes and so on from links redirects
 - [ ] Remove unwraps, handle errors properly everywhere
 - [ ] Better validation errors and documentation
 - [ ] Add more tests to all parser parts to document expectations / behavior of modules
