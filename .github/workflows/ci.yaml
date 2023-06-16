@@ -1,0 +1,13 @@
+---
+name: Platypul LOL CI 
+run-name: ${{ github.actor }} is testing ci🚀
+on: [push, pull-request]
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - run: make ci
+      - run: git diff --exit-code
+      - run: echo "🍏 This job's status is ${{ job.status }}."
