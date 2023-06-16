@@ -20,6 +20,7 @@
 - [x] Make list of commands page.
 - [-] ~Make configuration page.~ Not necessary
 - [x] Make hot reloading of config file.
+- [ ] Rename binary
 - [ ] Docker / systemd setup with cron-like update of config repo
 - [ ] Default to google or other configurable search engine
 - [ ] Make default and extra config (multiple config files possible)
