@@ -25,14 +25,14 @@ pub struct Config {
     redirects: Vec<ConfigLinkQuery<String>>,
 }
 
-const INSTALL_INSTRUCTIONS: &str = include_str!("../../../resources/index.html");
-const OPENSEARCH: &str = include_str!("../../../resources/opensearch.xml");
+const INSTALL_INSTRUCTIONS: &str = include_str!("../../resources/index.html");
+const OPENSEARCH: &str = include_str!("../../resources/opensearch.xml");
 lazy_static::lazy_static! {
     static ref ICONS: HashMap<&'static str, Vec<u8>> = HashMap::from([
-        ("/favicon-16x16.png", Vec::from(*include_bytes!("../../../resources/favicon-16x16.png"))),
-        ("/favicon-32x32.png", Vec::from(*include_bytes!("../../../resources/favicon-32x32.png"))),
-        ("/favicon-96x96.png", Vec::from(*include_bytes!("../../../resources/favicon-96x96.png"))),
-        ("/favicon.ico", Vec::from(*include_bytes!("../../../resources/favicon.ico"))),
+        ("/favicon-16x16.png", Vec::from(*include_bytes!("../../resources/favicon-16x16.png"))),
+        ("/favicon-32x32.png", Vec::from(*include_bytes!("../../resources/favicon-32x32.png"))),
+        ("/favicon-96x96.png", Vec::from(*include_bytes!("../../resources/favicon-96x96.png"))),
+        ("/favicon.ico", Vec::from(*include_bytes!("../../resources/favicon.ico"))),
     ]);
 }
 

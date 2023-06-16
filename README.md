@@ -25,7 +25,7 @@ Clone of bunny1 (or facebooks bunnylol) in Rust. Works as local server, or brows
 - [-] ~Make configuration page.~ Not necessary
 - [x] Make hot reloading of config file.
 - [x] Rename binary
-- [-] Check equivalency with haskell and delete haskell
+- [x] Check equivalency with haskell and delete haskell
 - [ ] Limit size for returning amount of suggestions to some reasonable number (20)
 - [ ] Docker / systemd setup with cron-like update of config repo
 - [ ] Default to google or other configurable search engine
