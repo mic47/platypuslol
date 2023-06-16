@@ -9,5 +9,4 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 nfa.workspace = true
-regex.workspace = true
 serde.workspace = true

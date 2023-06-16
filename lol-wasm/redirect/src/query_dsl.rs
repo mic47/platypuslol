@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use nfa::Regex;
+
 #[derive(Clone, Debug)]
 pub struct Substitution {
     pub name: String,
@@ -77,7 +79,7 @@ fn parse_braces(input: &str) -> Option<Vec<&str>> {
 pub enum QueryToken {
     Exact(String),
     Prefix(String),
-    Regex(String, regex::Regex),
+    Regex(String, Regex),
     Substitution(String, String, String),
 }
 
@@ -88,15 +90,11 @@ impl QueryToken {
             [item, "exact"] => Self::Exact((*item).into()),
             [item, "word"] => Self::Regex(
                 (*item).into(),
-                regex::Regex::new(r"\w+").map_err(|x| x.to_string())?,
+                Regex::new(r"\w+").map_err(|x| x.to_string())?,
             ),
             [item] | [item, "query"] => Self::Regex(
                 (*item).into(),
-                regex::Regex::new(r".+").map_err(|x| x.to_string())?,
-            ),
-            [item, "regex", regex] => Self::Regex(
-                (*item).into(),
-                regex::Regex::new(regex).map_err(|x| x.to_string())?,
+                Regex::new(r".+").map_err(|x| x.to_string())?,
             ),
             [item, "subst", type_, subtype] => Self::Substitution(
                 if item.is_empty() {

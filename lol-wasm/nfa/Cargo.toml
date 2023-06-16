@@ -8,4 +8,3 @@ name = "nfa"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-regex.workspace = true

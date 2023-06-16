@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{parse_link, parse_query, LinkToken, QueryToken, validate_query_with_link};
+use crate::{parse_link, parse_query, validate_query_with_link, LinkToken, QueryToken};
 use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

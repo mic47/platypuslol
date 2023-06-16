@@ -34,7 +34,7 @@ pub fn main() {
     let cli = <Cli as clap::Parser>::parse();
     let config: Config =
         serde_json::from_str(&std::fs::read_to_string(cli.link_config).unwrap()).unwrap();
-    let parser = create_parser(config.redirects, config.substitutions);
+    let parser = create_parser(config.redirects, config.substitutions).unwrap();
     let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
     for p in parsed.into_iter() {
         let ResolvedParsedOutput {

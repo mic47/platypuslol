@@ -3,6 +3,8 @@ use std::{
     collections::{HashMap, HashSet, VecDeque},
 };
 
+use crate::Regex;
+
 type Length = usize;
 type NodeIndex = usize;
 
@@ -20,7 +22,7 @@ pub enum Trace<T> {
 
 #[derive(Clone, Debug)]
 pub struct RegExEdge {
-    expression: regex::Regex,
+    expression: Regex,
     suggestion: String,
     target: Vec<NodeIndex>,
     identifier: String,
@@ -381,7 +383,7 @@ impl NFA<()> {
         NFA { nodes, root: 0 }
     }
 
-    pub fn regex(identifier: String, regex: regex::Regex) -> NFA<()> {
+    pub fn regex(identifier: String, regex: Regex) -> NFA<()> {
         let nodes = vec![
             Node::default().with_regex_edge(RegExEdge {
                 expression: regex,

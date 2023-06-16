@@ -17,7 +17,7 @@
 - [ ] Add better parser error handling -- more useful errors
 - [ ] Default to google or other configurable search engine
 - [ ] Make it possible to load parser from external configured url.
-- [ ] Consider removing regex node for compile time weight (or not bundle it into wasm).
+- [x] Consider removing regex node for compile time weight (or not bundle it into wasm).
 - [ ] Remove unwraps, handle errors properly everywhere
 - [ ] Removal of duplicit suggestions in API, not in client
 - [ ] Foldable list of command for same type of suggestion (substitutions)
