@@ -9,4 +9,7 @@ run:
 run-suggest:
 	cargo run --bin tool -- --link-config extension/commands.json --query "cr"
 run-server:
-	 cargo run --bin server -- --link-config extension/commands.json
+	 cargo run --bin platypus-lol -- --link-config extension/commands.json
+
+release:
+	cargo build --release --bin platypus-lol
