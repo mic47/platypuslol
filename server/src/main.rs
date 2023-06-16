@@ -10,7 +10,7 @@ use html_builder::{Buffer, Html5};
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use notify::{Event, RecursiveMode, Watcher};
+use notify::{Event, RecursiveMode, Watcher, INotifyWatcher};
 use serde::{Deserialize, Serialize};
 
 use nfa::NFA;
@@ -334,7 +334,7 @@ fn load_parser(path: &Path) -> anyhow::Result<Arc<NFA<(Vec<LinkToken>, Vec<Query
 fn config_watcher(
     path: PathBuf,
     parser: Arc<RwLock<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<INotifyWatcher> {
     let watcher_path = path.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
         let path = watcher_path.clone();
@@ -350,15 +350,15 @@ fn config_watcher(
                         Ok(new_parser) => {
                             let mut parser = parser.write().unwrap();
                             *parser = new_parser;
-                            println!("Config is reloaded {:?}", &path);
+                            eprintln!("Config is reloaded {:?}", &path);
                         }
                         Err(err) => {
-                            println!("Unable to load config: {err}");
+                            eprintln!("Unable to load config: {err}");
                         }
                     };
                 }
             }
-            Err(e) => println!("watch error: {:?}", e),
+            Err(e) => eprintln!("watch error: {:?}", e),
         }
     })?;
 
@@ -367,16 +367,18 @@ fn config_watcher(
     let parent = path.parent().unwrap_or(&path);
     watcher
         .watch(parent, RecursiveMode::Recursive)
-        .context("Unable to watch config file")
+        .context("Unable to watch config file")?;
+    Ok(watcher)
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = <Cli as clap::Parser>::parse();
+    eprintln!("Starting with following parameters {:#?}", cli);
 
     let parser = Arc::new(RwLock::new(load_parser(&cli.link_config)?));
 
-    config_watcher(cli.link_config.clone(), parser.clone())?;
+    let _watcher = config_watcher(cli.link_config.clone(), parser.clone())?;
     let default_server = format!("localhost:{}", cli.port);
     let default_protocol = "http://";
 

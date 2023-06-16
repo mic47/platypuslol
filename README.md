@@ -44,7 +44,7 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [x] Limit size for returning amount of suggestions to some reasonable number (20)
 - [x] Docker / systemd setup with cron-like update of config repo
 - [ ] When doing something wrong, substitute query for anything? -- parser do not allow it I think
-- [ ] Figure out why reloading of config does not work.
+- [x] Figure out why reloading of config does not work.
 - [ ] Default to google or other configurable search engine
 - [ ] Require space between suggestions, but not before / after if it's fixed word.
 - [ ] Make default and extra config (multiple config files possible)

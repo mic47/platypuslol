@@ -32,7 +32,7 @@ install: FORCE release
 	cat scripts/platypus-lol.service | envsubst > ${LOCAL_SYSTEMD}/platypus-lol.service
 	systemctl --user daemon-reload
 	systemctl --user enable platypus-lol
-	systemctl --user start platypus-lol
+	systemctl --user restart platypus-lol
 	systemctl --user status platypus-lol
 
 status: FORCE
@@ -41,7 +41,7 @@ status: FORCE
 start: FORCE
 	systemctl --user start platypus-lol
 
-start: FORCE
+restart: FORCE
 	systemctl --user restart platypus-lol
 
 logs: FORCE
