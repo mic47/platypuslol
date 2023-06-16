@@ -1,0 +1,34 @@
+[workspace]
+
+resolver = "2"
+members = [
+  "nfa",
+  "redirect",
+  "tool",
+  "wasm_lol",
+  "server",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.0.0"
+
+[workspace.dependencies]
+nfa = { path="nfa" }
+redirect = { path = "redirect" }
+tool = { path = "tool" }
+wasm_lol = { path = "wasm_lol" }
+server = { path = "server" }
+
+anyhow = "1.0.71"
+clap = { version = "4.3.3", features = ["derive"]}
+html-builder = "0.5.1"
+hyper = { version = "0.14", features = ["full"]}
+lazy_static = "1.4.0"
+notify = { version = "6.0.1", default-features = false, features = ["macos_kqueue"] }
+serde_json = "1.0.96"
+serde = { version = "1.0.164" , features = ["derive"] }
+serde_path_to_error = "0.1.11"
+tokio = { version = "1.28.2", features = ["full"]}
+url = "2.4.0"
+wasm-bindgen = "0.2.86"

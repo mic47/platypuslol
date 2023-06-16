@@ -1,0 +1,23 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+
+[[bin]]
+name = "platypus-lol"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+html-builder.workspace = true
+nfa.workspace = true
+notify.workspace = true
+redirect.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+hyper.workspace = true
+tokio.workspace = true
+clap.workspace = true
+url.workspace = true
+lazy_static.workspace = true

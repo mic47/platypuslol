@@ -1,25 +1,39 @@
 # platypuslol
 
-Clone of bunny1 (or facebooks bunnylol) in Haskell. Currently no ground breaking features, just simple playground project. Use at your own risk (for now).
+Clone of bunny1 (or facebooks bunnylol) in Rust. Works as local server, or browser extension (currently chrome only). Use at your own risk (for now).
 
-## Notes
+## TODO
 
-```
-stack build --haddock
-stack hoogle -- generate --local
-stack build hlint hscope haskell-tools-daemon haskell-tools-cli --copy-compiler-tool
-# this is sad:-(
-# How to get ghc-mod working: 
-# https://github.com/DanielG/ghc-mod/pull/922#issuecomment-353896120
-# TODO this is not scalable for more than 1 project
-stack hoogle -- server --local --port=8080
-```
-
-# TODO
-[ ] Git repository:
-  [x] Configure list of repositories
-  [x] Keep list of branches up to date
-  [x] Be able to resolve to github repo
-  [x] Have substitutions, like !branch! and then !branch.repo-base! !query.branch
-  [ ] Search for files / directories, hitory and so on
-  [ ] Config is getting too comples, switch to haskell at least for some environment stuff, and github stuff. Don't reinvent new languge
+- [x] Split into separate crates: nfa parser, redirect query, command line tool, wasm module
+- [x] Create mock extension (with faked suggestor)
+- [x] Bundle WASM into extension
+- [x] Plug in the parser (with hardcoded config or something like that).
+- [x] Fix suggestion behavior -- return multiple suggestions for substitutions
+- [x] Fix suggestion behavior -- return multipls suggestions in middle of substitution
+- [x] Figure out how to handle state
+- [x] Figure out how to handle configuration
+- [-] ~Extension pages: conflict resolution~ -- canceled, no conflict resolution, just everything
+- [x] Extension pages: list of all commands
+- [x] Extension pages: configuration
+- [x] Options validation
+- [-] ~Make it possible to load parser from external configured url.~ -- canceled, this is not easy, because of chrome security model
+- [x] Fix suggestions behavior (return longer items)
+- [x] Consider removing regex node for compile time weight (or not bundle it into wasm).
+- [ ] Removal of duplicit suggestions in API, not in client
+- [x] Make it as suggestion api server.
+- [x] Make list of commands page.
+- [-] ~Make configuration page.~ Not necessary
+- [x] Make hot reloading of config file.
+- [x] Rename binary
+- [x] Check equivalency with haskell and delete haskell
+- [x] Limit size for returning amount of suggestions to some reasonable number (20)
+- [ ] Docker / systemd setup with cron-like update of config repo
+- [ ] Default to google or other configurable search engine
+- [ ] Require space between suggestions, but not before / after if it's fixed word.
+- [ ] Make default and extra config (multiple config files possible)
+- [ ] Check for html escapes and so on from links redirects
+- [ ] Remove unwraps, handle errors properly everywhere
+- [ ] Better validation errors and documentation
+- [ ] Add more tests to all parser parts to document expectations / behavior of modules
+- [ ] Add better parser error handling -- more useful errors
+- [ ] Foldable list of command for same type of suggestion (substitutions)
