@@ -8,17 +8,22 @@
 - [x] Fix suggestion behavior -- return multipls suggestions in middle of substitution
 - [x] Figure out how to handle state
 - [x] Figure out how to handle configuration
-- [x] ~Extension pages: conflict resolution~ -- canceled, no conflict resolution, just everything
+- [-] ~Extension pages: conflict resolution~ -- canceled, no conflict resolution, just everything
 - [x] Extension pages: list of all commands
 - [x] Extension pages: configuration
 - [x] Options validation
-- [ ] Fix suggestions behavior (return longer items)
+- [-] ~Make it possible to load parser from external configured url.~ -- canceled, this is not easy, because of chrome security model
+- [x] Fix suggestions behavior (return longer items)
+- [x] Consider removing regex node for compile time weight (or not bundle it into wasm).
+- [ ] Removal of duplicit suggestions in API, not in client
+- [ ] Make it as suggestion api server.
+- [ ] Make list of commands page.
+- [ ] Make configuration page.
+- [ ] Make hot reloading of config file.
+- [ ] Docker / systemd setup with cron-like update of config repo
+- [ ] Default to google or other configurable search engine
+- [ ] Remove unwraps, handle errors properly everywhere
+- [ ] Better validation errors and documentation
 - [ ] Add more tests to all parser parts to document expectations / behavior of modules
 - [ ] Add better parser error handling -- more useful errors
-- [ ] Default to google or other configurable search engine
-- [ ] Make it possible to load parser from external configured url.
-- [x] Consider removing regex node for compile time weight (or not bundle it into wasm).
-- [ ] Remove unwraps, handle errors properly everywhere
-- [ ] Removal of duplicit suggestions in API, not in client
 - [ ] Foldable list of command for same type of suggestion (substitutions)
-- [ ] Better validation errors and documentation
