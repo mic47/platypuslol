@@ -1,4 +1,8 @@
 {
+  "fallback": {
+    "link": "https://www.google.com/search?q={query}",
+    "redirect_automatically": true
+  },
   "substitutions": {
     "product": [
       {

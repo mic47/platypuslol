@@ -21,8 +21,16 @@ use redirect::{
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
+    fallback: FallbackBehavior,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
     redirects: Vec<ConfigLinkQuery<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FallbackBehavior {
+    link: String,
+    redirect_automatically: bool,
+    query_prefix: String,
 }
 
 const INSTALL_INSTRUCTIONS: &str = include_str!("../../resources/index.html");
@@ -45,17 +53,24 @@ struct Cli {
     pub port: u16,
 }
 
-fn debug(
-    req: Request<Body>,
-    parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
-) -> anyhow::Result<Response<Body>> {
+struct State {
+    fallback: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
+    fallback_prefix: String,
+    fallback_redirect_automatically: bool,
+    parser: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
+}
+
+fn debug(req: Request<Body>, state: Arc<State>) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     if let Some(query) = p.get("q") {
-        let (parsed, suggested) = parser.parse_full_and_suggest(query);
-        let parsed: Vec<_> = parsed.into_iter().map(resolve_parsed_output).collect();
+        let (parsed, suggested) = state.parser.parse_full_and_suggest(query);
+        let parsed: Vec<_> = parsed
+            .into_iter()
+            .map(|x| resolve_parsed_output(x, &None))
+            .collect();
         let suggested: Vec<_> = suggested
             .into_iter()
-            .map(resolve_suggestion_output)
+            .map(|x| resolve_suggestion_output(x, &None))
             .collect();
         return to_string_response(
             serde_json::to_value((parsed, suggested)).context("Unable to serialize to json")?,
@@ -65,18 +80,15 @@ fn debug(
     Ok(not_found())
 }
 
-fn suggest(
-    req: Request<Body>,
-    parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
-) -> anyhow::Result<Response<Body>> {
+fn suggest(req: Request<Body>, state: Arc<State>) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     let mut suggestions_left: i32 = 20; // TODO: configure
     if let Some(query) = p.get("q") {
-        let (parsed, suggested) = parser.parse_full_and_suggest(query);
+        let (parsed, suggested) = state.parser.parse_full_and_suggest(query);
         let mut suggested_queries: Vec<String> = vec![];
         let mut suggested_texts: Vec<String> = vec![];
         let mut suggested_urls: Vec<String> = vec![];
-        for p in parsed.into_iter().map(resolve_parsed_output) {
+        for p in parsed.into_iter().map(|x| resolve_parsed_output(x, &None)) {
             suggested_texts.push(format!("{} => {}", p.description, p.link));
             suggested_queries.push(p.description);
             suggested_urls.push(p.link);
@@ -86,7 +98,10 @@ fn suggest(
             }
         }
         let mut visited: HashSet<_> = HashSet::default();
-        for s in suggested.into_iter().map(resolve_suggestion_output) {
+        for s in suggested
+            .into_iter()
+            .map(|x| resolve_suggestion_output(x, &None))
+        {
             if !visited.insert(s.clone()) {
                 continue;
             }
@@ -121,43 +136,78 @@ fn query_params(req: &Request<Body>) -> HashMap<String, String> {
         .unwrap_or_else(HashMap::new)
 }
 
-fn redirect(
-    req: Request<Body>,
-    parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
-) -> anyhow::Result<Response<Body>> {
+fn redirect(req: Request<Body>, state: Arc<State>) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     if let Some(query) = p.get("q") {
-        let (parsed, _) = parser.parse_full_and_suggest(query);
-        if let Some(p) = parsed.into_iter().map(resolve_parsed_output).next() {
-            return redirect_response(&p.link);
+        let parsers = vec![
+            Some((query.clone(), &state.parser)),
+            if state.fallback_redirect_automatically {
+                Some((
+                    format!("{} {}", state.fallback_prefix, query),
+                    &state.fallback,
+                ))
+            } else {
+                None
+            },
+        ];
+        for (query, parser) in parsers.into_iter().flatten() {
+            let (parsed, _) = parser.parse_full_and_suggest(&query);
+            if let Some(p) = parsed
+                .into_iter()
+                .map(|x| resolve_parsed_output(x, &None))
+                .next()
+            {
+                return redirect_response(&p.link);
+            }
         }
+        return list(req, state, Some(query));
     }
-    // TODO: default if you can't find any suggestion?
-    list(req, parser)
+    list(req, state, None)
 }
 
 fn list(
     req: Request<Body>,
-    parser: Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>,
+    state: Arc<State>,
+    failed_query: Option<&str>,
 ) -> anyhow::Result<Response<Body>> {
+    let mut failed_matches = vec![];
+    if let Some(failed_query) = failed_query {
+        let (parsed, _) = state
+            .fallback
+            .parse_full_and_suggest(&format!("{} {}", state.fallback_prefix, failed_query));
+        if let Some(p) = parsed
+            .into_iter()
+            .map(|x| resolve_parsed_output(x, &None))
+            .next()
+        {
+            failed_matches.push((p.description, Some(p.link)));
+        }
+    }
+
     let p = query_params(&req);
     let (used_query, (parsed, suggested)) = p
         .get("q")
         .and_then(|q| {
-            let (p, s) = parser.parse_full_and_suggest(q);
+            let (p, s) = state.parser.parse_full_and_suggest(q);
             if p.is_empty() && s.is_empty() {
                 None
             } else {
                 Some((Some(q), (p, s)))
             }
         })
-        .unwrap_or_else(|| (None, parser.parse_full_and_suggest("")));
+        .unwrap_or_else(|| (None, state.parser.parse_full_and_suggest("")));
     let mut matches = vec![];
-    for p in parsed.into_iter().map(resolve_parsed_output) {
+    for p in parsed
+        .into_iter()
+        .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
+    {
         matches.push((p.description, Some(p.link)))
     }
     let mut visited: HashSet<_> = HashSet::default();
-    for s in suggested.into_iter().map(resolve_suggestion_output) {
+    for s in suggested
+        .into_iter()
+        .map(|x| resolve_suggestion_output(x, &failed_query.map(Into::into)))
+    {
         if !visited.insert(s.clone()) {
             continue;
         }
@@ -179,7 +229,7 @@ fn list(
     }
     let mut body = html.body();
     let mut list = body.ul();
-    for (description, link) in matches.into_iter() {
+    for (description, link) in failed_matches.into_iter().chain(matches.into_iter()) {
         if let Some(link) = link {
             writeln!(
                 // TODO: escape link?
@@ -197,13 +247,13 @@ fn list(
 #[allow(clippy::type_complexity)]
 fn route(
     req: Request<Body>,
-    parser: Arc<RwLock<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>>,
+    state: Arc<RwLock<Arc<State>>>,
     template_variables: HashMap<String, String>,
 ) -> Result<Response<Body>, Infallible> {
     let method = req.method();
     let path = req.uri().path();
     let path = path.strip_suffix('/').unwrap_or(path);
-    let parser: Arc<NFA<_>> = { parser.read().unwrap().clone() };
+    let state: Arc<State> = { state.read().unwrap().clone() };
     Ok((match (method, path) {
         (&Method::GET, "") | (&Method::GET, "/install") => templated_string_response(
             INSTALL_INSTRUCTIONS.into(),
@@ -215,10 +265,10 @@ fn route(
             &template_variables,
             ContentType::OpenSearchDescription,
         ),
-        (&Method::GET, "/list") => list(req, parser),
-        (&Method::GET, "/debug") => debug(req, parser),
-        (&Method::GET, "/redirect") => redirect(req, parser),
-        (&Method::GET, "/suggest") => suggest(req, parser),
+        (&Method::GET, "/list") => list(req, state, None),
+        (&Method::GET, "/debug") => debug(req, state),
+        (&Method::GET, "/redirect") => redirect(req, state),
+        (&Method::GET, "/suggest") => suggest(req, state),
         (_, path) => {
             if let Some(icon) = ICONS.get(&path) {
                 bytes_response(icon.clone(), ContentType::Png)
@@ -317,24 +367,36 @@ fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
 }
 
 #[allow(clippy::type_complexity)]
-fn load_parser(path: &Path) -> anyhow::Result<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>> {
+fn load_parser(path: &Path) -> anyhow::Result<Arc<State>> {
     // TODO: better tool
     let config: Config = serde_json::from_str(
         &std::fs::read_to_string(path)
             .with_context(|| format!("Unable to find config file {:?}", path))?,
     )
     .context("Unable to parse config.")?;
-    Ok(Arc::new(
-        create_parser(config.redirects, config.substitutions)
+    Ok(Arc::new(State {
+        parser: create_parser(config.redirects, config.substitutions)
             .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))?,
-    ))
+        fallback_redirect_automatically: config.fallback.redirect_automatically,
+        fallback_prefix: config.fallback.query_prefix.clone(),
+        fallback: create_parser(
+            vec![ConfigLinkQuery {
+                query: format!("{} {{query:query}}", config.fallback.query_prefix),
+                link: config.fallback.link,
+            }],
+            Default::default(),
+        )
+        .map_err(|err| {
+            anyhow::anyhow!(
+                "Unable to create parser {}. Substitution should be named 'query'",
+                err
+            )
+        })?,
+    }))
 }
 
 #[allow(clippy::type_complexity)]
-fn config_watcher(
-    path: PathBuf,
-    parser: Arc<RwLock<Arc<NFA<(Vec<LinkToken>, Vec<QueryToken>)>>>>,
-) -> anyhow::Result<INotifyWatcher> {
+fn config_watcher(path: PathBuf, state: Arc<RwLock<Arc<State>>>) -> anyhow::Result<INotifyWatcher> {
     let watcher_path = path.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
         let path = watcher_path.clone();
@@ -348,7 +410,7 @@ fn config_watcher(
                     let new_parser = load_parser(&path);
                     match new_parser {
                         Ok(new_parser) => {
-                            let mut parser = parser.write().unwrap();
+                            let mut parser = state.write().unwrap();
                             *parser = new_parser;
                             eprintln!("Config is reloaded {:?}", &path);
                         }

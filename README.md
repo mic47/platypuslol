@@ -46,9 +46,9 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [x] Check equivalency with haskell and delete haskell
 - [x] Limit size for returning amount of suggestions to some reasonable number (20)
 - [x] Docker / systemd setup with cron-like update of config repo
-- [ ] When doing something wrong, substitute query for anything? -- parser do not allow it I think
+- [x] When doing something wrong, substitute query for anything? -- parser do not allow it I think
 - [x] Figure out why reloading of config does not work.
-- [ ] Default to google or other configurable search engine
+- [x] Default to google or other configurable search engine
 - [ ] Require space between suggestions, but not before / after if it's fixed word.
 - [ ] Make default and extra config (multiple config files possible)
 - [ ] Check for html escapes and so on from links redirects

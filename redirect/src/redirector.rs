@@ -114,12 +114,20 @@ fn process_trace(
     (matches, substitutions)
 }
 
-pub fn resolve_parsed_output(p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>) -> ResolvedParsedOutput {
+pub fn resolve_parsed_output(
+    p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>,
+    default_replacement: &Option<String>,
+) -> ResolvedParsedOutput {
     let (matches, substitutions) = process_trace(p.trace);
     ResolvedParsedOutput {
         score: p.score,
-        link: process_query(&matches, &substitutions, &p.payload.0),
-        description: process_suggestion(&matches, &substitutions, &p.payload.1),
+        link: process_query(&matches, &substitutions, &p.payload.0, default_replacement),
+        description: process_suggestion(
+            &matches,
+            &substitutions,
+            &p.payload.1,
+            default_replacement,
+        ),
     }
 }
 
@@ -127,6 +135,7 @@ fn process_query(
     matches: &HashMap<String, String>,
     substitutions: &HashMap<String, HashMap<String, String>>,
     query: &[LinkToken],
+    default_replacement: &Option<String>,
 ) -> String {
     query
         .iter()
@@ -138,7 +147,7 @@ fn process_query(
                     // even?
                     replacement.clone().replace(' ', "+")
                 } else {
-                    "<query>".into()
+                    default_replacement.clone().unwrap_or("<query>".into())
                 }
             }
             LinkToken::Substitution(type_, subtype) => {
@@ -157,6 +166,7 @@ fn process_suggestion(
     matches: &HashMap<String, String>,
     substitutions: &HashMap<String, HashMap<String, String>>,
     query: &[QueryToken],
+    default_replacement: &Option<String>,
 ) -> String {
     query
         .iter()
@@ -169,7 +179,7 @@ fn process_suggestion(
                     // even?
                     replacement.clone().replace(' ', "+")
                 } else {
-                    "<query>".into()
+                    default_replacement.clone().unwrap_or("<query>".into())
                 }
             }
             QueryToken::Substitution(type_, _, subtype) => {
@@ -192,17 +202,18 @@ pub struct ResolvedSuggestionOutput {
 
 pub fn resolve_suggestion_output(
     suggestion: Suggestion<(Vec<LinkToken>, Vec<QueryToken>)>,
+    default_replacement: &Option<String>,
 ) -> ResolvedSuggestionOutput {
     let (matches, substitutions) = process_trace(suggestion.trace);
     ResolvedSuggestionOutput {
         description: suggestion
             .payload
             .as_ref()
-            .map(|x| process_suggestion(&matches, &substitutions, &x.1))
+            .map(|x| process_suggestion(&matches, &substitutions, &x.1, default_replacement))
             .unwrap_or(suggestion.suggestion),
         link: suggestion
             .payload
             .as_ref()
-            .map(|x| process_query(&matches, &substitutions, &x.0)),
+            .map(|x| process_query(&matches, &substitutions, &x.0, default_replacement)),
     }
 }

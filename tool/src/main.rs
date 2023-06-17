@@ -41,14 +41,14 @@ pub fn main() {
             score,
             link,
             description,
-        } = resolve_parsed_output(p);
+        } = resolve_parsed_output(p, &None);
         //link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
         //println!("{:#?}", p);
         println!("{:10.5}: '{}', {:#?}", score, description, link);
     }
     let mut visited: HashSet<_> = HashSet::default();
     for s in suggested.into_iter() {
-        let s = resolve_suggestion_output(s);
+        let s = resolve_suggestion_output(s, &None);
         if visited.insert(s.clone()) {
             println!("{}: {}", s.description, s.link.unwrap_or(String::default()));
         }
