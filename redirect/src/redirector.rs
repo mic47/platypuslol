@@ -37,17 +37,21 @@ pub fn create_parser(
                             QueryToken::Regex(_, _) => {
                                 parsers.push(NFA::match_one_or_more_spaces());
                             }
-                            QueryToken::Substitution(_, _, _) => {
-                                parsers.push(NFA::match_one_or_more_spaces());
-                            }
-                            _ => match prev {
-                                QueryToken::Regex(_, _) => {
+                            QueryToken::Substitution(_, _, _) => match prev {
+                                QueryToken::Regex(_, _) | QueryToken::Substitution(_, _, _) => {
                                     parsers.push(NFA::match_one_or_more_spaces())
                                 }
-                                QueryToken::Substitution(_, _, _) => {
+                                QueryToken::Exact(_) | QueryToken::Prefix(_) => {
+                                    parsers.push(NFA::match_one_or_more_spaces())
+                                }
+                            },
+                            QueryToken::Exact(_) | QueryToken::Prefix(_) => match prev {
+                                QueryToken::Regex(_, _) | QueryToken::Substitution(_, _, _) => {
                                     parsers.push(NFA::match_one_or_more_spaces());
                                 }
-                                _ => parsers.push(NFA::match_zero_or_more_spaces()),
+                                QueryToken::Exact(_) | QueryToken::Prefix(_) => {
+                                    parsers.push(NFA::match_zero_or_more_spaces())
+                                }
                             },
                         }
                     }
