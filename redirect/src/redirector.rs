@@ -11,6 +11,15 @@ pub struct ConfigLinkQuery<L> {
     pub link: L,
 }
 
+impl<L: Clone> ConfigLinkQuery<L> {
+    pub fn prefix(&self, prefix: &str) -> Self {
+        Self {
+            query: format!("{} {}", prefix, &self.query),
+            link: self.link.clone(),
+        }
+    }
+}
+
 #[allow(clippy::type_complexity)]
 pub fn create_parser(
     redirects: Vec<ConfigLinkQuery<String>>,
