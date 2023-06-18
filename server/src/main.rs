@@ -7,16 +7,18 @@ use std::sync::{Arc, RwLock};
 
 use anyhow::Context;
 use html_builder::{Buffer, Html5};
+use hyper::body::Buf;
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use notify::{Event, INotifyWatcher, RecursiveMode, Watcher};
 
 use nfa::NFA;
 use redirect::{
     create_parser, resolve_parsed_output, resolve_suggestion_output, Config, ConfigLinkQuery,
-    FallbackBehavior, LinkToken, QueryToken,
+    ConfigUrl, ExternalParser, FallbackBehavior, LinkToken, QueryToken, RedirectConfig,
 };
+use tokio::runtime::Runtime;
 
 const INSTALL_INSTRUCTIONS: &str = include_str!("../../resources/index.html");
 const OPENSEARCH: &str = include_str!("../../resources/opensearch.xml");
@@ -26,6 +28,11 @@ lazy_static::lazy_static! {
         ("/favicon-32x32.png", Vec::from(*include_bytes!("../../resources/favicon-32x32.png"))),
         ("/favicon-96x96.png", Vec::from(*include_bytes!("../../resources/favicon-96x96.png"))),
         ("/favicon.ico", Vec::from(*include_bytes!("../../resources/favicon.ico"))),
+    ]);
+
+    static ref BUILTIN_PARSERS: HashMap<String, &'static str> = HashMap::from([
+        ("commands/base.json".into(), include_str!("../../extension/commands/base.json")),
+        ("commands/google.json".into(), include_str!("../../extension/commands/google.json")),
     ]);
 }
 
@@ -355,17 +362,128 @@ fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
     Response::from_parts(parts, body)
 }
 
+fn create_parser_with_optional_prefix(
+    redirects: Vec<ConfigLinkQuery<String>>,
+    substitutions: HashMap<String, Vec<HashMap<String, String>>>,
+    prefix: Option<String>,
+) -> anyhow::Result<NFA<(Vec<LinkToken>, Vec<QueryToken>)>> {
+    if let Some(prefix) = prefix {
+        create_parser(
+            redirects.into_iter().map(|x| x.prefix(&prefix)).collect(),
+            substitutions,
+        )
+        .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))
+    } else {
+        create_parser(redirects, substitutions)
+            .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))
+    }
+}
+
 #[allow(clippy::type_complexity)]
-fn load_config(path: &Path) -> anyhow::Result<Arc<State>> {
+async fn load_config(config_path: &Path) -> anyhow::Result<Arc<State>> {
     // TODO: better tool
     let config: Config<String> = serde_json::from_str(
-        &std::fs::read_to_string(path)
-            .with_context(|| format!("Unable to find config file {:?}", path))?,
+        &std::fs::read_to_string(config_path)
+            .with_context(|| format!("Unable to find config file {:?}", config_path))?,
     )
     .context("Unable to parse config.")?;
-    Ok(Arc::new(State {
-        parser: create_parser(config.redirects.redirects, config.redirects.substitutions)
+    let mut parsers = vec![
+        create_parser(config.redirects.redirects, config.redirects.substitutions)
             .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))?,
+        // TODO: add base parser
+    ];
+    for (url, conf) in config.external_configurations.into_iter().chain([(
+        ConfigUrl::Builtin {
+            path: "commands/base.json".into(),
+        },
+        ExternalParser {
+            enabled: true,
+            prefix: None,
+        },
+    )]) {
+        if !conf.enabled {
+            continue;
+        }
+        match url {
+            ConfigUrl::Builtin { path } => {
+                let config: RedirectConfig<String> = serde_json::from_str(
+                    BUILTIN_PARSERS
+                        .get(&path)
+                        .with_context(|| format!("Unable to find builtin config {path}"))?,
+                )
+                .with_context(|| format!("Unable to parse builtin config {path}"))?;
+                let parser = create_parser_with_optional_prefix(
+                    config.redirects,
+                    config.substitutions,
+                    conf.prefix,
+                )
+                .map_err(|err| {
+                    anyhow::anyhow!(
+                        "Unable to create parser from builtin config {}: {}",
+                        path,
+                        err
+                    )
+                })?;
+                parsers.push(parser);
+            }
+            ConfigUrl::Local { path } => {
+                let parent = config_path.parent().unwrap_or(config_path);
+                let content = std::fs::read_to_string(&parent.join(&path))
+                    .with_context(|| format!("Unable to find config file {:?}", path))?;
+                let config: RedirectConfig<String> = serde_json::from_str(&content)
+                    .with_context(|| format!("Unable to parse config {path}"))?;
+                let parser = create_parser_with_optional_prefix(
+                    config.redirects,
+                    config.substitutions,
+                    conf.prefix,
+                )
+                .map_err(|err| {
+                    anyhow::anyhow!("Unable to create parser from config {}: {}", path, err)
+                })?;
+                parsers.push(parser);
+            }
+            ConfigUrl::Remote { url } => {
+                let fun = || async {
+                    let client = Client::new();
+                    let res = client
+                        .get(
+                            url.parse::<Uri>()
+                                .with_context(|| format!("Unable to parse url {}", url))?,
+                        )
+                        .await?;
+                    if !res.status().is_success() {
+                        // TODO: report error
+                        Err(anyhow::anyhow!(
+                            "Received bas status {:?} when processing {}",
+                            res.status(),
+                            url
+                        ))?
+                    }
+                    let body = hyper::body::aggregate(res).await.context("TODO")?;
+                    let config: RedirectConfig<String> =
+                        serde_json::from_reader(body.reader()).context("TODO")?;
+                    let parser = create_parser_with_optional_prefix(
+                        config.redirects,
+                        config.substitutions,
+                        conf.prefix,
+                    )
+                    .map_err(|err| {
+                        anyhow::anyhow!("Unable to create parser from config {}: {}", url, err)
+                    })?;
+                    Ok::<_, anyhow::Error>(parser)
+                };
+                fun()
+                    .await
+                    .map(|parser| {
+                        parsers.push(parser);
+                    })
+                    .map_err(|err| eprintln!("Unable to fetch & parse external config {err}"))
+                    .ok();
+            }
+        }
+    }
+    Ok(Arc::new(State {
+        parser: NFA::any_of(&parsers),
         fallback: Fallback {
             behavior: config.fallback.clone(),
             parser: create_parser(
@@ -397,17 +515,24 @@ fn config_watcher(path: PathBuf, state: Arc<RwLock<Arc<State>>>) -> anyhow::Resu
                     .iter()
                     .any(|x| path.file_name().map(|p| x.ends_with(p)).unwrap_or(true))
                 {
-                    let new_parser = load_config(&path);
-                    match new_parser {
-                        Ok(new_parser) => {
-                            let mut parser = state.write().unwrap();
-                            *parser = new_parser;
-                            eprintln!("Config is reloaded {:?}", &path);
-                        }
-                        Err(err) => {
-                            eprintln!("Unable to load config: {err}");
-                        }
-                    };
+                    Runtime::new()
+                        .map(|x| {
+                            let new_parser = x.block_on(load_config(&path));
+                            match new_parser {
+                                Ok(new_parser) => {
+                                    let mut parser = state.write().unwrap();
+                                    *parser = new_parser;
+                                    eprintln!("Config is reloaded {:?}", &path);
+                                }
+                                Err(err) => {
+                                    eprintln!("Unable to load config: {err}");
+                                }
+                            };
+                        })
+                        .map_err(|err| {
+                            eprintln!("Unable to create tokyo runtime to load parser: {err}");
+                        })
+                        .ok();
                 }
             }
             Err(e) => eprintln!("watch error: {:?}", e),
@@ -428,7 +553,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = <Cli as clap::Parser>::parse();
     eprintln!("Starting with following parameters {:#?}", cli);
 
-    let parser = Arc::new(RwLock::new(load_config(&cli.link_config)?));
+    let parser = Arc::new(RwLock::new(load_config(&cli.link_config).await?));
 
     let _watcher = config_watcher(cli.link_config.clone(), parser.clone())?;
     let default_server = format!("localhost:{}", cli.port);

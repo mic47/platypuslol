@@ -1,0 +1,56 @@
+{
+  "substitutions": {
+    "product": [
+      {
+        "type": "document",
+        "url_part": "document"
+      },
+      {
+        "type": "sheet",
+        "url_part": "spreadsheets"
+      },
+      {
+        "type": "presentation",
+        "url_part": "presentation"
+      },
+      {
+        "type": "drawing",
+        "url_part": "drawings"
+      }
+    ]
+  },
+  "redirects": [
+    {
+      "query": "google {query:query}",
+      "link": "https://www.google.com/search?q={query}"
+    },
+    {
+      "query": "mail",
+      "link": "https://mail.google.com/mail/u/0"
+    },
+    {
+      "query": "search mail {query}",
+      "link": "https://mail.google.com/mail/u/0/#search/{query}"
+    },
+    {
+      "query": "docs",
+      "link": "https://docs.google.com/document/u/0/"
+    },
+    {
+      "query": "calendar",
+      "link": "https://calendar.google.com/calendar/b/1/r"
+    },
+    {
+      "query": "search google docs {query}",
+      "link": "https://docs.google.com/document/u/0/?q={query}&tgif=d"
+    },
+    {
+      "query": "create google {:subst:product:type}",
+      "link": "https://docs.google.com/{product:url_part}/u/0/create"
+    },
+    {
+      "query": "google cloud storage {query}",
+      "link": "https://console.cloud.google.com/storage/browser/{query}?authuser=0"
+    }
+  ]
+}

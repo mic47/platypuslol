@@ -10,11 +10,55 @@ pub struct RedirectConfig<T> {
     pub redirects: Vec<ConfigLinkQuery<T>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ConfigUrl {
+    Builtin { path: String },
+    Local { path: String },
+    Remote { url: String },
+}
+
+impl<'de> Deserialize<'de> for ConfigUrl {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let url: &str = Deserialize::deserialize(deserializer)?;
+        Ok(if let Some(path) = url.strip_prefix("builtin://") {
+            ConfigUrl::Builtin { path: path.into() }
+        } else if let Some(path) = url.strip_prefix("local://") {
+            ConfigUrl::Local { path: path.into() }
+        } else {
+            ConfigUrl::Remote { url: url.into() }
+        })
+    }
+}
+
+impl Serialize for ConfigUrl {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ConfigUrl::Builtin { path } => serializer.serialize_str(&format!("builtin://{path}")),
+            ConfigUrl::Local { path } => serializer.serialize_str(&format!("local://{path}")),
+            ConfigUrl::Remote { url } => serializer.serialize_str(url),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExternalParser {
+    pub enabled: bool,
+    #[serde(default)]
+    pub prefix: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config<T> {
     pub fallback: FallbackBehavior,
     #[serde(flatten)]
     pub redirects: RedirectConfig<T>,
+    pub external_configurations: HashMap<ConfigUrl, ExternalParser>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

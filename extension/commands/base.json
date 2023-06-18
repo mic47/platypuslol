@@ -1,0 +1,13 @@
+{
+  "substitutions": {},
+  "redirects": [
+    {
+      "query": "list",
+      "link": "list"
+    },
+    {
+      "query": "install",
+      "link": "install"
+    }
+  ]
+}
