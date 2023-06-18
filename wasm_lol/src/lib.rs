@@ -1,18 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use nfa::NFA;
 use redirect::{
-    create_parser, resolve_parsed_output, resolve_suggestion_output, ConfigLinkQuery, LinkToken,
-    QueryToken, ResolvedParsedOutput,
+    create_parser, resolve_parsed_output, resolve_suggestion_output, LinkToken, QueryToken,
+    RedirectConfig, ResolvedParsedOutput,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
-
-#[derive(Deserialize)]
-pub struct JsConfig {
-    substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-    redirects: Vec<ConfigLinkQuery<String>>,
-}
 
 #[wasm_bindgen]
 pub struct ExtensionParser {
@@ -67,7 +61,7 @@ impl ExtensionParser {
 
 #[wasm_bindgen]
 pub fn init_parser(js_config: &str) -> Result<ExtensionParser, String> {
-    let config: JsConfig = serde_path_to_error::deserialize(
+    let config: RedirectConfig<String> = serde_path_to_error::deserialize(
         serde_json::from_str::<serde_json::Value>(js_config).map_err(|x| x.to_string())?,
     )
     .map_err(|x| x.to_string())?;

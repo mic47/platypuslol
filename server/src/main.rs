@@ -11,27 +11,12 @@ use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use notify::{Event, INotifyWatcher, RecursiveMode, Watcher};
-use serde::{Deserialize, Serialize};
 
 use nfa::NFA;
 use redirect::{
-    create_parser, resolve_parsed_output, resolve_suggestion_output, ConfigLinkQuery, LinkToken,
-    QueryToken,
+    create_parser, resolve_parsed_output, resolve_suggestion_output, Config, ConfigLinkQuery,
+    FallbackBehavior, LinkToken, QueryToken,
 };
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config {
-    fallback: FallbackBehavior,
-    substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-    redirects: Vec<ConfigLinkQuery<String>>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FallbackBehavior {
-    link: String,
-    redirect_automatically: bool,
-    query_prefix: String,
-}
 
 const INSTALL_INSTRUCTIONS: &str = include_str!("../../resources/index.html");
 const OPENSEARCH: &str = include_str!("../../resources/opensearch.xml");
@@ -53,10 +38,13 @@ struct Cli {
     pub port: u16,
 }
 
+struct Fallback {
+    parser: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
+    behavior: FallbackBehavior,
+}
+
 struct State {
-    fallback: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
-    fallback_prefix: String,
-    fallback_redirect_automatically: bool,
+    fallback: Fallback,
     parser: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
 }
 
@@ -141,10 +129,10 @@ fn redirect(req: Request<Body>, state: Arc<State>) -> anyhow::Result<Response<Bo
     if let Some(query) = p.get("q") {
         let parsers = vec![
             Some((query.clone(), &state.parser)),
-            if state.fallback_redirect_automatically {
+            if state.fallback.behavior.redirect_automatically {
                 Some((
-                    format!("{} {}", state.fallback_prefix, query),
-                    &state.fallback,
+                    state.fallback.behavior.make_query(query),
+                    &state.fallback.parser,
                 ))
             } else {
                 None
@@ -174,7 +162,8 @@ fn list(
     if let Some(failed_query) = failed_query {
         let (parsed, _) = state
             .fallback
-            .parse_full_and_suggest(&format!("{} {}", state.fallback_prefix, failed_query));
+            .parser
+            .parse_full_and_suggest(&state.fallback.behavior.make_query(failed_query));
         if let Some(p) = parsed
             .into_iter()
             .map(|x| resolve_parsed_output(x, &None))
@@ -367,31 +356,32 @@ fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
 }
 
 #[allow(clippy::type_complexity)]
-fn load_parser(path: &Path) -> anyhow::Result<Arc<State>> {
+fn load_config(path: &Path) -> anyhow::Result<Arc<State>> {
     // TODO: better tool
-    let config: Config = serde_json::from_str(
+    let config: Config<String> = serde_json::from_str(
         &std::fs::read_to_string(path)
             .with_context(|| format!("Unable to find config file {:?}", path))?,
     )
     .context("Unable to parse config.")?;
     Ok(Arc::new(State {
-        parser: create_parser(config.redirects, config.substitutions)
+        parser: create_parser(config.redirects.redirects, config.redirects.substitutions)
             .map_err(|err| anyhow::anyhow!("Unable to create parser {}", err))?,
-        fallback_redirect_automatically: config.fallback.redirect_automatically,
-        fallback_prefix: config.fallback.query_prefix.clone(),
-        fallback: create_parser(
-            vec![ConfigLinkQuery {
-                query: format!("{} {{query:query}}", config.fallback.query_prefix),
-                link: config.fallback.link,
-            }],
-            Default::default(),
-        )
-        .map_err(|err| {
-            anyhow::anyhow!(
-                "Unable to create parser {}. Substitution should be named 'query'",
-                err
+        fallback: Fallback {
+            behavior: config.fallback.clone(),
+            parser: create_parser(
+                vec![ConfigLinkQuery {
+                    query: config.fallback.make_query("{query:query}"),
+                    link: config.fallback.link,
+                }],
+                Default::default(),
             )
-        })?,
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "Unable to create parser {}. Substitution should be named 'query'",
+                    err
+                )
+            })?,
+        },
     }))
 }
 
@@ -407,7 +397,7 @@ fn config_watcher(path: PathBuf, state: Arc<RwLock<Arc<State>>>) -> anyhow::Resu
                     .iter()
                     .any(|x| path.file_name().map(|p| x.ends_with(p)).unwrap_or(true))
                 {
-                    let new_parser = load_parser(&path);
+                    let new_parser = load_config(&path);
                     match new_parser {
                         Ok(new_parser) => {
                             let mut parser = state.write().unwrap();
@@ -438,7 +428,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = <Cli as clap::Parser>::parse();
     eprintln!("Starting with following parameters {:#?}", cli);
 
-    let parser = Arc::new(RwLock::new(load_parser(&cli.link_config)?));
+    let parser = Arc::new(RwLock::new(load_config(&cli.link_config)?));
 
     let _watcher = config_watcher(cli.link_config.clone(), parser.clone())?;
     let default_server = format!("localhost:{}", cli.port);

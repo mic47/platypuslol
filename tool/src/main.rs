@@ -1,20 +1,9 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
-
-use serde::{Deserialize, Serialize};
+use std::{collections::HashSet, path::PathBuf};
 
 use redirect::{
-    create_parser, resolve_parsed_output, resolve_suggestion_output, ConfigLinkQuery,
+    create_parser, resolve_parsed_output, resolve_suggestion_output, RedirectConfig,
     ResolvedParsedOutput,
 };
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config {
-    substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-    redirects: Vec<ConfigLinkQuery<String>>,
-}
 
 #[derive(clap::Parser)]
 struct Cli {
@@ -32,7 +21,7 @@ pub fn main() {
     // - [ ] Construct more advanced parser (actually use the DSL)
     // - [ ] Add substitutions
     let cli = <Cli as clap::Parser>::parse();
-    let config: Config =
+    let config: RedirectConfig<String> =
         serde_json::from_str(&std::fs::read_to_string(cli.link_config).unwrap()).unwrap();
     let parser = create_parser(config.redirects, config.substitutions).unwrap();
     let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
