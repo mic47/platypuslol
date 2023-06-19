@@ -47,18 +47,24 @@ impl Serialize for ConfigUrl {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ExternalParser {
+pub struct ExternalParser<R> {
     pub enabled: bool,
     #[serde(default)]
     pub prefix: Option<String>,
+    #[serde(skip, default = "default_none")]
+    pub config: Option<R>,
+}
+
+fn default_none<T>() -> Option<T> {
+    None
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config<T> {
+pub struct Config<T, R> {
     pub fallback: FallbackBehavior,
     #[serde(flatten)]
     pub redirects: RedirectConfig<T>,
-    pub external_configurations: HashMap<ConfigUrl, ExternalParser>,
+    pub external_configurations: HashMap<ConfigUrl, ExternalParser<R>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
