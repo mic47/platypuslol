@@ -123,26 +123,8 @@ fn query_params(req: &Request<Body>) -> HashMap<String, String> {
 fn redirect(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     if let Some(query) = p.get("q") {
-        let parsers = vec![
-            Some((query.clone(), &state.parser)),
-            if state.fallback.behavior.redirect_automatically {
-                Some((
-                    state.fallback.behavior.make_query(query),
-                    &state.fallback.parser,
-                ))
-            } else {
-                None
-            },
-        ];
-        for (query, parser) in parsers.into_iter().flatten() {
-            let (parsed, _) = parser.parse_full_and_suggest(&query);
-            if let Some(p) = parsed
-                .into_iter()
-                .map(|x| resolve_parsed_output(x, &None))
-                .next()
-            {
-                return redirect_response(&p.link);
-            }
+        if let Some(link) = state.redirect(query) {
+            return redirect_response(&link);
         }
         return list(req, state, Some(query));
     }

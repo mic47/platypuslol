@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use nfa::NFA;
 
 use crate::{
-    create_parser, Config, ConfigLinkQuery, ConfigUrl, FallbackBehavior, LinkToken, QueryToken,
-    RedirectConfig,
+    create_parser, resolve_parsed_output, Config, ConfigLinkQuery, ConfigUrl, FallbackBehavior,
+    LinkToken, QueryToken, RedirectConfig,
 };
 
 pub struct Fallback {
@@ -67,6 +67,31 @@ impl CommonAppState {
                 })?,
             },
         })
+    }
+
+    pub fn redirect(&self, query: &str) -> Option<String> {
+        let parsers = vec![
+            Some((query.into(), &self.parser)),
+            if self.fallback.behavior.redirect_automatically {
+                Some((
+                    self.fallback.behavior.make_query(query),
+                    &self.fallback.parser,
+                ))
+            } else {
+                None
+            },
+        ];
+        for (query, parser) in parsers.into_iter().flatten() {
+            let (parsed, _) = parser.parse_full_and_suggest(&query);
+            if let Some(p) = parsed
+                .into_iter()
+                .map(|x| resolve_parsed_output(x, &None))
+                .next()
+            {
+                return Some(p.link);
+            }
+        }
+        None
     }
 }
 
