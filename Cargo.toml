@@ -22,6 +22,7 @@ server = { path = "server" }
 
 anyhow = "1.0.71"
 clap = { version = "4.3.3", features = ["derive"]}
+futures-util = "0.3.28"
 html-builder = "0.5.1"
 hyper = { version = "0.14", features = ["full"]}
 lazy_static = "1.4.0"
