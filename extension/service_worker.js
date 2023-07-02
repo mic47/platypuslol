@@ -1,8 +1,10 @@
 import init, {init_parser} from './wasm_lol/lol_wasm.js';
+import {resolve_config} from './config.js';
 
 var parser = null;
 
 function set_parser(config) {
+  // TODO: resolve external configs, and so on, store downloadded parts in local cache
   parser = init_parser(config);
 	const default_suggestion = parser.suggest("");
 	chrome.storage.local.set({default_suggestion: default_suggestion});
@@ -15,7 +17,9 @@ init().then(() => {
     chrome.storage.sync.get(
       { config: JSON.stringify(defaultConfig) },
     ).then((items) => {
-			set_parser(items.config);
+      resolve_config(JSON.parse(items.config)).then((resolved_config) => {
+        return set_parser(JSON.stringify(resolved_config));
+      })
     });
   });
 });
@@ -32,7 +36,6 @@ function escapeHTML(string){
 
 chrome.omnibox.onInputChanged.addListener((text, send_suggestion) => {
   let sug = parser.suggest(text);
-	console.log(sug);
   let suggestions = JSON.parse(sug);
   var output = [];
   for (var i = 0; i < Math.min(20, suggestions.length) ; i++) {
@@ -64,7 +67,9 @@ chrome.omnibox.onInputEntered.addListener((text) => {
 chrome.storage.onChanged.addListener(
   (changes, areaName) => {
     if (areaName == "sync" && changes.config != undefined && changes.config.newValue != undefined) {
-			set_parser(changes.config.newValue);
+      resolve_config(JSON.parse(changes.config.newValue)).then((config) => {
+        return set_parser(JSON.stringify(config));
+      });
     }
   }
 )

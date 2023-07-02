@@ -51,7 +51,7 @@ pub struct ExternalParser<R> {
     pub enabled: bool,
     #[serde(default)]
     pub prefix: Option<String>,
-    #[serde(skip, default = "default_none")]
+    #[serde(default = "default_none")]
     pub config: Option<R>,
 }
 
