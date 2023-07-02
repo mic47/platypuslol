@@ -1,0 +1,9 @@
+{
+  "substitutions": {},
+  "redirects": [
+    {
+      "query": "pull requests",
+      "link": "https://github.com/pulls"
+    }
+  ]
+}
