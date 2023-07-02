@@ -20,7 +20,7 @@ export function resolve_config(config) {
       } else if (k.startsWith("local://")) {
         console.log('Local files are not supported', k)
       } else {
-        to_fetch.push(fetch(k).then((result) => result.json()).then((result) => [k, result]).catch(
+        to_fetch.push(fetch(k, {"mode": "no-cors"}).then((result) => result.json()).then((result) => [k, result]).catch(
           (_) => [k, old_external_config[k]])
         )
       }
