@@ -7,33 +7,14 @@
   "external_configurations": {
     "builtin://commands/google.json": {
       "enabled": true
+    },
+    "builtin://commands/python.json": {
+      "enabled": true
+    },
+    "builtin://commands/github.json": {
+      "enabled": true
     }
   },
   "substitutions": {},
-  "redirects": [
-    {
-      "query": "bing {query:query}",
-      "link": "https://www.bing.com/search?q={query}"
-    },
-    {
-      "query": "obi {query}",
-      "link": "https://www.obi.sk/search/{query}"
-    },
-    {
-      "query": "ikea {query}",
-      "link": "https://www.ikea.com/sk/sk/search/products/?q={query}"
-    },
-    {
-      "query": "pull requests",
-      "link": "https://github.com/pulls"
-    },
-    {
-      "query": "pip {query}",
-      "link": "https://pypi.org/search/?q={query}"
-    },
-    {
-      "query": "python documentation {query}",
-      "link": "https://docs.python.org/3/library/{query}.html"
-    }
-  ]
+  "redirects": []
 }

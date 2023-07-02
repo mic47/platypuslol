@@ -32,6 +32,8 @@ lazy_static::lazy_static! {
     static ref BUILTIN_PARSERS: HashMap<String, &'static str> = HashMap::from([
         ("commands/base.json".into(), include_str!("../../extension/commands/base.json")),
         ("commands/google.json".into(), include_str!("../../extension/commands/google.json")),
+        ("commands/python.json".into(), include_str!("../../extension/commands/python.json")),
+        ("commands/github.json".into(), include_str!("../../extension/commands/github.json")),
     ]);
 }
 

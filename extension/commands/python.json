@@ -1,0 +1,13 @@
+{
+  "substitutions": {},
+  "redirects": [
+    {
+      "query": "pip {query}",
+      "link": "https://pypi.org/search/?q={query}"
+    },
+    {
+      "query": "python documentation {query}",
+      "link": "https://docs.python.org/3/library/{query}.html"
+    }
+  ]
+}
