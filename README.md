@@ -50,9 +50,9 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [x] Figure out why reloading of config does not work.
 - [x] Default to google or other configurable search engine
 - [x] Require space between suggestions, but not before / after if it's fixed word.
-- [ ] Test for 2 different substitutions of same type
-- [ ] Make default and extra config (multiple config files possible)
-- [ ] Add possible to have local files
+- [x] Test for 2 different substitutions of same type
+- [x] Make default and extra config (multiple config files possible)
+- [x] Add possible to have local files
 - [ ] keyboard shortcut for list page if possible to fill
 - [ ] Check for html escapes and so on from links redirects
 - [ ] Remove unwraps, handle errors properly everywhere
