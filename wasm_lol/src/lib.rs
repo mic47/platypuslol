@@ -54,7 +54,7 @@ pub fn init_parser(js_config: &str) -> Result<ExtensionParser, String> {
         &serde_json::from_str::<serde_json::Value>(js_config).map_err(|x| x.to_string())?,
     )
     .map_err(|x| x.to_string())?;
-    let app_state = CommonAppState::new(config)?;
+    let app_state = CommonAppState::new(config, Default::default())?;
     Ok(ExtensionParser { state: app_state })
 }
 
