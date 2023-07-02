@@ -488,11 +488,7 @@ fn config_watcher(
         let path = watcher_path.clone();
         match res {
             Ok(event) => {
-                if event
-                    .paths
-                    .iter()
-                    .any(|x| path.file_name().map(|p| x.ends_with(p)).unwrap_or(true))
-                {
+                if event.paths.iter().any(|x| x.ends_with(".json")) {
                     Runtime::new()
                         .map(|x| {
                             let new_parser = x.block_on(load_config(&path));
