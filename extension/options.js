@@ -52,6 +52,18 @@ const restoreOptions = () => {
       element.rows = Math.max(as_text.split("\n").length, 50);
     }
   );
+  chrome.storage.local.get(
+    ["external_configurations"],
+    (items) => {
+      var element = document.getElementById('remote_configs');
+      if (items.external_configurations !== undefined && items.external_configurations !== null) {
+        const as_text = JSON.stringify(JSON.parse(items.external_configurations), null, 2);
+        element.innerHTML = as_text;
+      } else {
+        element.innerHTML = "";
+      }
+    }
+  )
 };
 
 document.addEventListener('DOMContentLoaded', restoreOptions);
