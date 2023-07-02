@@ -1,38 +1,27 @@
 use std::collections::HashSet;
 
-use nfa::NFA;
 use redirect::{
-    create_parser, resolve_parsed_output, resolve_suggestion_output, LinkToken, QueryToken,
-    RedirectConfig, ResolvedParsedOutput,
+    resolve_parsed_output, resolve_suggestion_output, CommonAppState, Config, RedirectConfig,
+    ResolvedParsedOutput,
 };
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct ExtensionParser {
-    parser: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
+    state: CommonAppState,
 }
 
 #[wasm_bindgen]
 impl ExtensionParser {
     #[wasm_bindgen]
     pub fn redirect(&self, text: &str) -> Option<String> {
-        let (parsed, _) = self.parser.parse_full_and_suggest(text);
-        if let Some(p) = parsed.into_iter().next() {
-            let ResolvedParsedOutput {
-                score: _,
-                link,
-                description: _,
-            } = resolve_parsed_output(p, &None);
-            Some(link)
-        } else {
-            None
-        }
+        self.state.redirect(text)
     }
 
     #[wasm_bindgen]
     pub fn suggest(&self, text: &str) -> Result<String, String> {
-        let (parsed, suggestions) = self.parser.parse_full_and_suggest(text);
+        let (parsed, suggestions) = self.state.parser.parse_full_and_suggest(text);
         let mut output = vec![];
         for p in parsed.into_iter() {
             let ResolvedParsedOutput {
@@ -61,13 +50,12 @@ impl ExtensionParser {
 
 #[wasm_bindgen]
 pub fn init_parser(js_config: &str) -> Result<ExtensionParser, String> {
-    let config: RedirectConfig<String> = serde_path_to_error::deserialize(
-        serde_json::from_str::<serde_json::Value>(js_config).map_err(|x| x.to_string())?,
+    let config: Config<String, RedirectConfig<String>> = serde_path_to_error::deserialize(
+        &serde_json::from_str::<serde_json::Value>(js_config).map_err(|x| x.to_string())?,
     )
     .map_err(|x| x.to_string())?;
-    Ok(ExtensionParser {
-        parser: create_parser(config.redirects, config.substitutions)?,
-    })
+    let app_state = CommonAppState::new(config)?;
+    Ok(ExtensionParser { state: app_state })
 }
 
 #[wasm_bindgen]
