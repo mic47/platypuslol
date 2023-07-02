@@ -131,6 +131,17 @@ fn redirect(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Re
     list(req, state, None)
 }
 
+fn local(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Response<Body>> {
+    let p = query_params(&req);
+    if let Some(file) = p.get("file") {
+        match state.local_configs.get(file) {
+            Some(content) => return to_string_response(content, ContentType::Json),
+            None => Err(anyhow::anyhow!("Missing file {}", file))?,
+        }
+    }
+    Err(anyhow::anyhow!("Missing parameter file"))
+}
+
 fn list(
     req: Request<Body>,
     state: Arc<CommonAppState>,
@@ -234,6 +245,7 @@ fn route(
         (&Method::GET, "/list") => list(req, state, None),
         (&Method::GET, "/debug") => debug(req, state),
         (&Method::GET, "/redirect") => redirect(req, state),
+        (&Method::GET, "/config") => local(req, state),
         (&Method::GET, "/suggest") => suggest(req, state),
         (_, path) => {
             if let Some(icon) = ICONS.get(&path) {
@@ -334,7 +346,10 @@ fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
 
 async fn load_fetch_and_parse_configs(
     config_path: &Path,
-) -> anyhow::Result<Config<String, RedirectConfig<String>>> {
+) -> anyhow::Result<(
+    Config<String, RedirectConfig<String>>,
+    HashMap<String, String>,
+)> {
     // TODO: make sure error messages have line numbers / serde path
     let Config::<String, ()> {
         fallback,
@@ -345,6 +360,18 @@ async fn load_fetch_and_parse_configs(
             .with_context(|| format!("Unable to find config file {:?}", config_path))?,
     )
     .context("Unable to parse config.")?;
+    let local_configs = external_configurations
+        .iter()
+        .filter_map(|(url, _)| match url.clone() {
+            ConfigUrl::Local { path } => {
+                let parent = config_path.parent().unwrap_or(config_path);
+                std::fs::read_to_string(parent.join(&path))
+                    .ok()
+                    .map(|content| (path.clone(), content))
+            }
+            _ => None,
+        })
+        .collect::<HashMap<_, _>>();
     let external_configurations: anyhow::Result<HashMap<_, _>> = futures_util::future::join_all(
         external_configurations
             .into_iter()
@@ -430,18 +457,22 @@ async fn load_fetch_and_parse_configs(
     .await
     .into_iter()
     .collect();
-    Ok(Config {
-        fallback,
-        redirects,
-        external_configurations: external_configurations?,
-    })
+    Ok((
+        Config {
+            fallback,
+            redirects,
+            external_configurations: external_configurations?,
+        },
+        local_configs,
+    ))
 }
 
 async fn load_config(config_path: &Path) -> anyhow::Result<Arc<CommonAppState>> {
     load_fetch_and_parse_configs(config_path)
         .await
-        .and_then(|x| {
-            CommonAppState::new(x).map_err(|err| anyhow::anyhow!("Unable to create state: {err}"))
+        .and_then(|(x, local_configs)| {
+            CommonAppState::new(x, local_configs)
+                .map_err(|err| anyhow::anyhow!("Unable to create state: {err}"))
         })
         .map(Arc::new)
 }
