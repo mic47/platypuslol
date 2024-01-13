@@ -52,10 +52,13 @@ impl ExtensionParser {
 
 #[wasm_bindgen]
 pub fn init_parser(js_config: &str) -> Result<ExtensionParser, String> {
-    let config: Config<String, RedirectConfig<String>> = serde_path_to_error::deserialize(
-        &serde_json::from_str::<serde_json::Value>(js_config).map_err(|x| x.to_string())?,
-    )
-    .map_err(|x| x.to_string())?;
+    let config: Config<String, RedirectConfig<String>> =
+        Config::<String, RedirectConfig<String>>::from_config_file(
+            serde_path_to_error::deserialize(
+                &serde_json::from_str::<serde_json::Value>(js_config).map_err(|x| x.to_string())?,
+            )
+            .map_err(|x| x.to_string())?,
+        )?;
     let app_state = CommonAppState::new(config, Default::default())?;
     Ok(ExtensionParser { state: app_state })
 }

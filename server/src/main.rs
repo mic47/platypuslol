@@ -403,11 +403,14 @@ async fn load_fetch_and_parse_configs(
         fallback,
         redirects,
         external_configurations,
-    } = serde_json::from_str(
-        &std::fs::read_to_string(config_path)
-            .with_context(|| format!("Unable to find config file {:?}", config_path))?,
+    } = Config::<String, ()>::from_config_file(
+        serde_json::from_str(
+            &std::fs::read_to_string(config_path)
+                .with_context(|| format!("Unable to find config file {:?}", config_path))?,
+        )
+        .context("Unable to parse config.")?,
     )
-    .context("Unable to parse config.")?;
+    .map_err(anyhow::Error::msg)?;
     let local_configs = external_configurations
         .iter()
         .filter_map(|(url, _)| match url.clone() {
@@ -437,12 +440,15 @@ async fn load_fetch_and_parse_configs(
                 let config = if redirect_config.enabled {
                     match url.clone() {
                         ConfigUrl::Builtin { path } => {
-                            let ret: RedirectConfig<String> = serde_json::from_str(
-                                BUILTIN_PARSERS.get(&path).with_context(|| {
-                                    format!("Unable to find builtin config {path}")
+                            let ret: RedirectConfig<String> = RedirectConfig::from_config_file(
+                                serde_json::from_str(BUILTIN_PARSERS.get(&path).with_context(
+                                    || format!("Unable to find builtin config {path}"),
+                                )?)
+                                .with_context(|| {
+                                    format!("Unable to parse builtin config {path}")
                                 })?,
                             )
-                            .with_context(|| format!("Unable to parse builtin config {path}"))?;
+                            .map_err(anyhow::Error::msg)?;
                             Some(ret)
                         }
                         ConfigUrl::Local { path } => {
@@ -451,8 +457,11 @@ async fn load_fetch_and_parse_configs(
                                 .with_context(|| {
                                     format!("Unable to find config file {:?}", path)
                                 })?;
-                            let config: RedirectConfig<String> = serde_json::from_str(&content)
-                                .with_context(|| format!("Unable to parse config {path}"))?;
+                            let config: RedirectConfig<String> = RedirectConfig::from_config_file(
+                                serde_json::from_str(&content)
+                                    .with_context(|| format!("Unable to parse config {path}"))?,
+                            )
+                            .map_err(anyhow::Error::msg)?;
                             Some(config)
                         }
                         ConfigUrl::Remote { url } => {
@@ -473,7 +482,10 @@ async fn load_fetch_and_parse_configs(
                                 }
                                 let body = hyper::body::aggregate(res).await.context("TODO")?;
                                 let config: RedirectConfig<String> =
-                                    serde_json::from_reader(body.reader()).context("TODO")?;
+                                    RedirectConfig::from_config_file(
+                                        serde_json::from_reader(body.reader()).context("TODO")?,
+                                    )
+                                    .map_err(anyhow::Error::msg)?;
                                 anyhow::Ok(config)
                             };
                             fun()
