@@ -180,7 +180,7 @@ fn list(
             failed_matches.push((p.description, Some(p.links)));
         }
     }
-    let mut available_key_classes = "fjdkslahgFJDKSLAHGrueiwoqptRUEIWOQPTyvncmxbzYVNCMXBZ"
+    let mut available_key_classes = "fjdkslahgrueiwoqptyvncmxbz1234567890"
         .chars()
         .map(|c| (format!("[{}] ", c), format!("onpress{}", c)));
 
