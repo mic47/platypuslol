@@ -458,6 +458,7 @@ async fn load_fetch_and_parse_configs(
                 },
                 ExternalParser::<()> {
                     enabled: true,
+                    substitutions_to_inherit: vec![],
                     prefix: None,
                     config: None,
                 },
@@ -527,6 +528,7 @@ async fn load_fetch_and_parse_configs(
                 };
                 let ExternalParser {
                     enabled,
+                    substitutions_to_inherit,
                     prefix,
                     config: _,
                 } = redirect_config;
@@ -534,6 +536,7 @@ async fn load_fetch_and_parse_configs(
                     url,
                     ExternalParser {
                         enabled,
+                        substitutions_to_inherit,
                         prefix,
                         config,
                     },

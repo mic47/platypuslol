@@ -49,6 +49,7 @@ impl Serialize for ConfigUrl {
 #[derive(Clone, Debug)]
 pub struct ExternalParser<R> {
     pub enabled: bool,
+    pub substitutions_to_inherit: Vec<String>,
     pub prefix: Option<String>,
     pub config: Option<R>,
 }
@@ -81,6 +82,7 @@ impl Config<String, ()> {
                         k,
                         ExternalParser {
                             enabled: v.enabled,
+                            substitutions_to_inherit: v.substitutions_to_inherit,
                             prefix: v.prefix,
                             config: None,
                         },
@@ -108,6 +110,7 @@ impl Config<String, RedirectConfig<String>> {
                         k,
                         ExternalParser {
                             enabled: v.enabled,
+                            substitutions_to_inherit: v.substitutions_to_inherit,
                             prefix: v.prefix,
                             config: v
                                 .config
@@ -163,14 +166,18 @@ pub struct ConfigFile<R> {
 pub struct ExternalParserFile<R> {
     pub enabled: bool,
     #[serde(default)]
+    pub substitutions_to_inherit: Vec<String>,
+    #[serde(default)]
     pub prefix: Option<String>,
     #[serde(default = "default_none")]
     pub config: Option<R>,
 }
 
+pub type Substitutions = HashMap<String, Vec<HashMap<String, String>>>;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RedirectConfigFile {
-    pub substitutions: HashMap<String, Vec<HashMap<String, String>>>,
+    pub substitutions: Substitutions,
     pub redirects: Vec<ConfigLinkQueryFile>,
 }
 

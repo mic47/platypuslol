@@ -28,7 +28,24 @@ impl CommonAppState {
             redirects,
             external_configurations,
         } = loaded_config;
-        let mut parsers = vec![create_parser(redirects.redirects, redirects.substitutions)
+        let mut substitutions = redirects.substitutions;
+        for (t, ext_conf) in external_configurations.iter() {
+            if let Some(ref conf) = ext_conf.config {
+                for subst_key in ext_conf.substitutions_to_inherit.iter() {
+                    if let Some(subst_value) = conf.substitutions.get(subst_key) {
+                        if substitutions.contains_key(subst_key) {
+                            return Err(format!(
+                                "Substitution key '{}' from '{:?}' already exists",
+                                subst_key, t
+                            ));
+                        } else {
+                            substitutions.insert(subst_key.clone(), subst_value.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut parsers = vec![create_parser(redirects.redirects, substitutions)
             .map_err(|err| format!("Unable to create parser from main config: {}", err))?];
         for (url, config) in external_configurations.into_iter() {
             if !config.enabled {
