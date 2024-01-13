@@ -8,14 +8,14 @@ use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfigLinkQuery<L> {
     pub query: String,
-    pub link: L,
+    pub links: Vec<L>,
 }
 
 impl<L: Clone> ConfigLinkQuery<L> {
     pub fn prefix(&self, prefix: &str) -> Self {
         Self {
             query: format!("{} {}", prefix, &self.query),
-            link: self.link.clone(),
+            links: self.links.clone(),
         }
     }
 }
@@ -24,7 +24,7 @@ impl<L: Clone> ConfigLinkQuery<L> {
 pub fn create_parser(
     redirects: Vec<ConfigLinkQuery<String>>,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-) -> Result<NFA<(Vec<LinkToken>, Vec<QueryToken>)>, String> {
+) -> Result<NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>, String> {
     Ok(NFA::any_of(
         &(redirects
             .into_iter()
@@ -32,11 +32,18 @@ pub fn create_parser(
             .map(|c| {
                 // TODO: handle errors here
                 let sentence = parse_query(&c.query)?;
-                let link = parse_link(&c.link)?;
-                validate_query_with_link(&sentence, &c.query, &link, &c.link)?;
+                let links = c
+                    .links
+                    .iter()
+                    .map(|link| {
+                        let parsed_link: Vec<LinkToken> = parse_link(link)?;
+                        validate_query_with_link(&sentence, &c.query, &parsed_link, link)?;
+                        Result::<_, String>::Ok(parsed_link)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
                 let c = ConfigLinkQuery {
                     query: c.query,
-                    link,
+                    links,
                 };
                 let mut prev = None;
                 let mut parsers = vec![];
@@ -88,7 +95,7 @@ pub fn create_parser(
                     });
                     prev = Some(word.clone())
                 }
-                Ok(NFA::chain(&parsers).with_payload_for_final_nodes(&(c.link, sentence)))
+                Ok(NFA::chain(&parsers).with_payload_for_final_nodes(&(c.links, sentence)))
             })
             .collect::<Result<Vec<_>, String>>())?,
     ))
@@ -97,12 +104,14 @@ pub fn create_parser(
 #[derive(Serialize)]
 pub struct ResolvedParsedOutput {
     pub score: f64,
-    pub link: String,
+    pub links: Vec<String>,
     pub description: String,
 }
 
+type Sentence = Vec<LinkToken>;
+
 fn process_trace(
-    trace: Vec<Trace<&(Vec<LinkToken>, Vec<QueryToken>)>>,
+    trace: Vec<Trace<&(Vec<Sentence>, Vec<QueryToken>)>>,
 ) -> (
     HashMap<String, String>,
     HashMap<String, HashMap<String, String>>,
@@ -128,13 +137,18 @@ fn process_trace(
 }
 
 pub fn resolve_parsed_output(
-    p: Parsed<(Vec<LinkToken>, Vec<QueryToken>)>,
+    p: Parsed<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     default_replacement: &Option<String>,
 ) -> ResolvedParsedOutput {
     let (matches, substitutions) = process_trace(p.trace);
     ResolvedParsedOutput {
         score: p.score,
-        link: process_query(&matches, &substitutions, &p.payload.0, default_replacement),
+        links: p
+            .payload
+            .0
+            .iter()
+            .map(|payload| process_query(&matches, &substitutions, payload, default_replacement))
+            .collect(),
         description: process_suggestion(
             &matches,
             &substitutions,
@@ -209,12 +223,12 @@ fn process_suggestion(
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize)]
 pub struct ResolvedSuggestionOutput {
-    pub link: Option<String>,
+    pub links: Option<Vec<String>>,
     pub description: String,
 }
 
 pub fn resolve_suggestion_output(
-    suggestion: Suggestion<(Vec<LinkToken>, Vec<QueryToken>)>,
+    suggestion: Suggestion<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     default_replacement: &Option<String>,
 ) -> ResolvedSuggestionOutput {
     let (matches, substitutions) = process_trace(suggestion.trace);
@@ -224,9 +238,10 @@ pub fn resolve_suggestion_output(
             .as_ref()
             .map(|x| process_suggestion(&matches, &substitutions, &x.1, default_replacement))
             .unwrap_or(suggestion.suggestion),
-        link: suggestion
-            .payload
-            .as_ref()
-            .map(|x| process_query(&matches, &substitutions, &x.0, default_replacement)),
+        links: suggestion.payload.as_ref().map(|x| {
+            x.0.iter()
+                .map(|link| process_query(&matches, &substitutions, link, default_replacement))
+                .collect()
+        }),
     }
 }

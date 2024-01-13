@@ -8,13 +8,13 @@ use crate::{
 };
 
 pub struct Fallback {
-    pub parser: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
+    pub parser: NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     pub behavior: FallbackBehavior,
 }
 
 pub struct CommonAppState {
     pub fallback: Fallback,
-    pub parser: NFA<(Vec<LinkToken>, Vec<QueryToken>)>,
+    pub parser: NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     pub local_configs: HashMap<String, String>,
 }
 
@@ -60,7 +60,7 @@ impl CommonAppState {
                 parser: create_parser(
                     vec![ConfigLinkQuery {
                         query: fallback.make_query("{query:query}"),
-                        link: fallback.link,
+                        links: vec![fallback.link],
                     }],
                     Default::default(),
                 )
@@ -74,7 +74,7 @@ impl CommonAppState {
         })
     }
 
-    pub fn redirect(&self, query: &str) -> Option<String> {
+    pub fn redirect(&self, query: &str) -> Option<Vec<String>> {
         let parsers = vec![
             Some((query.into(), &self.parser)),
             if self.fallback.behavior.redirect_automatically {
@@ -93,7 +93,7 @@ impl CommonAppState {
                 .map(|x| resolve_parsed_output(x, &None))
                 .next()
             {
-                return Some(p.link);
+                return Some(p.links);
             }
         }
         None
@@ -105,7 +105,7 @@ fn create_parser_with_optional_prefix(
     redirects: Vec<ConfigLinkQuery<String>>,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
     prefix: Option<String>,
-) -> Result<NFA<(Vec<LinkToken>, Vec<QueryToken>)>, String> {
+) -> Result<NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>, String> {
     if let Some(prefix) = prefix {
         create_parser(
             redirects.into_iter().map(|x| x.prefix(&prefix)).collect(),

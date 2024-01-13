@@ -75,9 +75,13 @@ fn suggest(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Res
         let mut suggested_texts: Vec<String> = vec![];
         let mut suggested_urls: Vec<String> = vec![];
         for p in parsed.into_iter().map(|x| resolve_parsed_output(x, &None)) {
-            suggested_texts.push(format!("{} => {}", p.description, p.link));
-            suggested_queries.push(p.description);
-            suggested_urls.push(p.link);
+            suggested_texts.push(format!("{} => {:?}", p.description, p.links));
+            suggested_queries.push(p.description.clone());
+            if let [link] = &p.links[..] {
+                suggested_urls.push(link.clone());
+            } else {
+                suggested_urls.push(format!("redirect?q={}", p.description));
+            }
             suggestions_left -= 1;
             if suggestions_left <= 0 {
                 break;
@@ -92,12 +96,16 @@ fn suggest(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Res
                 continue;
             }
             suggested_texts.push(format!(
-                "{} ➡️  {}",
+                "{} ➡️  {:?}",
                 s.description,
-                s.link.clone().unwrap_or("???".into())
+                s.links.as_ref().unwrap_or(&vec!["???".into()])
             ));
-            suggested_queries.push(s.description);
-            suggested_urls.push(s.link.unwrap_or("???".into()));
+            suggested_queries.push(s.description.clone());
+            if let [link] = &s.links.unwrap_or(vec!["???".into()])[..] {
+                suggested_urls.push(link.clone());
+            } else {
+                suggested_urls.push(format!("redirect?q={}", s.description));
+            }
             suggestions_left -= 1;
             if suggestions_left <= 0 {
                 break;
@@ -119,7 +127,7 @@ fn query_params(req: &Request<Body>) -> HashMap<String, String> {
                 .into_owned()
                 .collect()
         })
-        .unwrap_or_else(HashMap::new)
+        .unwrap_or_default()
 }
 
 fn redirect(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Response<Body>> {
@@ -160,7 +168,7 @@ fn list(
             .map(|x| resolve_parsed_output(x, &None))
             .next()
         {
-            failed_matches.push((p.description, Some(p.link)));
+            failed_matches.push((p.description, Some(p.links)));
         }
     }
 
@@ -181,7 +189,7 @@ fn list(
         .into_iter()
         .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
     {
-        matches.push((p.description, Some(p.link)))
+        matches.push((p.description, Some(p.links)))
     }
     let mut visited: HashSet<_> = HashSet::default();
     for s in suggested
@@ -191,7 +199,7 @@ fn list(
         if !visited.insert(s.clone()) {
             continue;
         }
-        matches.push((s.description, s.link))
+        matches.push((s.description, s.links))
     }
     matches.sort();
 
@@ -209,14 +217,29 @@ fn list(
     }
     let mut body = html.body();
     let mut list = body.ul();
-    for (description, link) in failed_matches.into_iter().chain(matches.into_iter()) {
-        if let Some(link) = link {
-            writeln!(
-                // TODO: escape link?
-                list.li().a().attr(&format!("href='{}'", link)),
-                "{}",
-                description,
-            )?;
+    for (description, links) in failed_matches.into_iter().chain(matches.into_iter()) {
+        if let Some(links) = links {
+            if let [link] = &links[..] {
+                writeln!(
+                    // TODO: escape link?
+                    list.li().a().attr(&format!("href='{}'", link)),
+                    "{}",
+                    description,
+                )?;
+            } else {
+                let mut li = list.li();
+                let mut div = li.span();
+                writeln!(div, "{}", description,)?;
+                let mut ul = div.ul();
+                for link in links {
+                    writeln!(
+                        // TODO: escape link?
+                        ul.li().a().attr(&format!("href='{}'", link)),
+                        "{}",
+                        link,
+                    )?;
+                }
+            }
         } else {
             writeln!(list.li(), "{}", description,)?;
         }
@@ -324,13 +347,36 @@ fn templated_string_response(
     Ok(Response::from_parts(parts, body))
 }
 
-fn redirect_response(uri: &str) -> anyhow::Result<Response<Body>> {
-    let (mut parts, body) = Response::<Body>::default().into_parts();
-    parts
-        .headers
-        .insert(hyper::header::LOCATION, HeaderValue::from_str(uri)?);
-    parts.status = StatusCode::FOUND;
-    Ok(Response::from_parts(parts, body))
+fn redirect_multi(links: &[String]) -> anyhow::Result<String> {
+    Ok(format!(
+        "<html>
+<head>
+  <script>
+    var data = {};
+    for (var i = 1; i < data.length ; i++) {{
+      window.open(data[i], \"_blank\");
+    }};
+    window.location.href = data[0];
+  </script>
+</head>
+<body onload=\"redirectLol()\">
+<body>
+</html>",
+        serde_json::to_string(links).context("Unable to convert links to string")?,
+    ))
+}
+
+fn redirect_response(uris: &[String]) -> anyhow::Result<Response<Body>> {
+    if let [uri] = uris {
+        let (mut parts, body) = Response::<Body>::default().into_parts();
+        parts
+            .headers
+            .insert(hyper::header::LOCATION, HeaderValue::from_str(uri)?);
+        parts.status = StatusCode::FOUND;
+        Ok(Response::from_parts(parts, body))
+    } else {
+        to_string_response(redirect_multi(uris)?, ContentType::Html)
+    }
 }
 
 fn not_found() -> Response<Body> {
