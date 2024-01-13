@@ -28,18 +28,18 @@ pub fn main() {
     for p in parsed.into_iter() {
         let ResolvedParsedOutput {
             score,
-            link,
+            links,
             description,
         } = resolve_parsed_output(p, &None);
         //link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
         //println!("{:#?}", p);
-        println!("{:10.5}: '{}', {:#?}", score, description, link);
+        println!("{:10.5}: '{}', {:#?}", score, description, links);
     }
     let mut visited: HashSet<_> = HashSet::default();
     for s in suggested.into_iter() {
         let s = resolve_suggestion_output(s, &None);
         if visited.insert(s.clone()) {
-            println!("{}: {}", s.description, s.link.unwrap_or(String::default()));
+            println!("{}: {:?}", s.description, s.links.unwrap_or_default());
         }
     }
 }

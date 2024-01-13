@@ -16,7 +16,9 @@ pub struct ExtensionParser {
 impl ExtensionParser {
     #[wasm_bindgen]
     pub fn redirect(&self, text: &str) -> Option<String> {
-        self.state.redirect(text)
+        self.state
+            .redirect(text)
+            .and_then(|x| serde_json::to_string(&x).ok())
     }
 
     #[wasm_bindgen]
@@ -26,12 +28,12 @@ impl ExtensionParser {
         for p in parsed.into_iter() {
             let ResolvedParsedOutput {
                 score: _,
-                link,
+                links,
                 description,
             } = resolve_parsed_output(p, &None);
             output.push(Suggestion {
                 text: description,
-                link,
+                links,
             })
         }
         let mut visited: HashSet<_> = HashSet::default();
@@ -40,7 +42,7 @@ impl ExtensionParser {
             if visited.insert(s.clone()) {
                 output.push(Suggestion {
                     text: s.description,
-                    link: s.link.unwrap_or(Default::default()),
+                    links: s.links.unwrap_or_default(),
                 })
             }
         }
@@ -62,5 +64,5 @@ pub fn init_parser(js_config: &str) -> Result<ExtensionParser, String> {
 #[derive(Serialize)]
 pub struct Suggestion {
     text: String,
-    link: String,
+    links: Vec<String>,
 }
