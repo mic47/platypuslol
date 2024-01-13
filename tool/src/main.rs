@@ -21,8 +21,10 @@ pub fn main() {
     // - [ ] Construct more advanced parser (actually use the DSL)
     // - [ ] Add substitutions
     let cli = <Cli as clap::Parser>::parse();
-    let config: RedirectConfig<String> =
-        serde_json::from_str(&std::fs::read_to_string(cli.link_config).unwrap()).unwrap();
+    let config: RedirectConfig<String> = RedirectConfig::from_config_file(
+        serde_json::from_str(&std::fs::read_to_string(cli.link_config).unwrap()).unwrap(),
+    )
+    .unwrap();
     let parser = create_parser(config.redirects, config.substitutions).unwrap();
     let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
     for p in parsed.into_iter() {

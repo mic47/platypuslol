@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::{parse_link, parse_query, validate_query_with_link, LinkToken, QueryToken};
 use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ConfigLinkQuery<L> {
     pub query: String,
     pub links: Vec<L>,
