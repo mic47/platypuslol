@@ -152,6 +152,42 @@ fn local(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Respo
     Err(anyhow::anyhow!("Missing parameter file"))
 }
 
+const LIST_JS: &str = "
+function onKeyPress(event) {
+  var cls = 'onpress' + event.key;
+  var elements = Array
+    .from(document.getElementsByClassName(cls))
+    .filter((tag) => tag.tagName.toLowerCase() == 'a');
+  if (elements.length == 0) {
+    return;
+  }
+  for (var i = 1; i < elements.length; i++) {
+    var href = elements[i].href;
+    if (href != undefined && href != null) {
+      window.open(href, \"_blank\");
+    }
+  }
+  var href = elements[0].href;
+  if (href != undefined && href != null) {
+    window.location.href = href;
+  }
+}
+
+function onLoad() {
+  var input = document
+    .querySelector('body')
+    .addEventListener('keydown', onKeyPress);
+}
+";
+
+fn add_key_class(class: Option<String>, item: html_builder::Node) -> html_builder::Node {
+    if let Some(class) = class {
+        item.attr(&format!("class='{}'", class))
+    } else {
+        item
+    }
+}
+
 fn list(
     req: Request<Body>,
     state: Arc<CommonAppState>,
@@ -171,6 +207,9 @@ fn list(
             failed_matches.push((p.description, Some(p.links)));
         }
     }
+    let mut available_key_classes = "fjdkslahgFJDKSLAHGrueiwoqptRUEIWOQPTyvncmxbzYVNCMXBZ"
+        .chars()
+        .map(|c| (format!("[{}] ", c), format!("onpress{}", c)));
 
     let p = query_params(&req);
     let (used_query, (parsed, suggested)) = p
@@ -205,36 +244,48 @@ fn list(
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
-    writeln!(html.head().title(), "List of platypus lol commands")?;
+    let mut head = html.head();
+    writeln!(head.title(), "List of platypus lol commands")?;
+    writeln!(head.script().raw(), "{}", LIST_JS)?;
+    let mut body = html.body().attr("onload='onLoad()'");
     if let Some(used_query) = used_query {
-        writeln!(
-            html.body().h1(),
-            "List of Commands for Query '{}'",
-            used_query
-        )?;
+        writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
     } else {
-        writeln!(html.body().h1(), "List of All Commands")?;
+        writeln!(body.h1(), "List of All Commands")?;
     }
-    let mut body = html.body();
     let mut list = body.ul();
     for (description, links) in failed_matches.into_iter().chain(matches.into_iter()) {
         if let Some(links) = links {
             if let [link] = &links[..] {
+                let maybe_key = available_key_classes.next();
                 writeln!(
                     // TODO: escape link?
-                    list.li().a().attr(&format!("href='{}'", link)),
-                    "{}",
+                    add_key_class(
+                        maybe_key.clone().map(|x| x.1),
+                        list.li().a().attr(&format!("href='{}'", link))
+                    ),
+                    "{}{}",
+                    maybe_key.map(|x| x.0).unwrap_or_default(),
                     description,
                 )?;
             } else {
                 let mut li = list.li();
                 let mut div = li.span();
-                writeln!(div, "{}", description,)?;
+                let maybe_key = available_key_classes.next();
+                writeln!(
+                    div,
+                    "{}{}",
+                    maybe_key.clone().map(|x| x.0).unwrap_or_default(),
+                    description
+                )?;
                 let mut ul = div.ul();
                 for link in links {
                     writeln!(
                         // TODO: escape link?
-                        ul.li().a().attr(&format!("href='{}'", link)),
+                        add_key_class(
+                            maybe_key.clone().map(|x| x.1),
+                            ul.li().a().attr(&format!("href='{}'", link))
+                        ),
                         "{}",
                         link,
                     )?;
@@ -352,11 +403,13 @@ fn redirect_multi(links: &[String]) -> anyhow::Result<String> {
         "<html>
 <head>
   <script>
-    var data = {};
-    for (var i = 1; i < data.length ; i++) {{
-      window.open(data[i], \"_blank\");
-    }};
-    window.location.href = data[0];
+function redirectLol() {{
+  var data = {};
+  for (var i = 1; i < data.length ; i++) {{
+    window.open(data[i], \"_blank\");
+  }};
+  window.location.href = data[0];
+}}
   </script>
 </head>
 <body onload=\"redirectLol()\">
