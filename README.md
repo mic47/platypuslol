@@ -1,6 +1,6 @@
 # platypuslol
 
-Clone of bunny1 (or facebooks bunnylol) in Rust. Works as local server, or browser extension (currently chrome only). Use at your own risk (for now).
+Clone of bunny1 (or facebooks bunnylol) in Rust. Works as local server, or browser extension (currently chrome only, possibly broken). Use at your own risk (for now).
 
 ## Instructions
 

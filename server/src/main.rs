@@ -36,6 +36,7 @@ lazy_static::lazy_static! {
         ("commands/github.json".into(), include_str!("../../extension/commands/github.json")),
     ]);
 }
+const LIST_JS: &str = include_str!("../../resources/keypress.js");
 
 #[derive(Clone, Debug, clap::Parser)]
 struct Cli {
@@ -151,34 +152,6 @@ fn local(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Respo
     }
     Err(anyhow::anyhow!("Missing parameter file"))
 }
-
-const LIST_JS: &str = "
-function onKeyPress(event) {
-  var cls = 'onpress' + event.key;
-  var elements = Array
-    .from(document.getElementsByClassName(cls))
-    .filter((tag) => tag.tagName.toLowerCase() == 'a');
-  if (elements.length == 0) {
-    return;
-  }
-  for (var i = 1; i < elements.length; i++) {
-    var href = elements[i].href;
-    if (href != undefined && href != null) {
-      window.open(href, \"_blank\");
-    }
-  }
-  var href = elements[0].href;
-  if (href != undefined && href != null) {
-    window.location.href = href;
-  }
-}
-
-function onLoad() {
-  var input = document
-    .querySelector('body')
-    .addEventListener('keydown', onKeyPress);
-}
-";
 
 fn add_key_class(class: Option<String>, item: html_builder::Node) -> html_builder::Node {
     if let Some(class) = class {
@@ -406,13 +379,13 @@ fn redirect_multi(links: &[String]) -> anyhow::Result<String> {
 function redirectLol() {{
   var data = {};
   for (var i = 1; i < data.length ; i++) {{
-    window.open(data[i], \"_blank\");
+    window.open(data[i], '_blank');
   }};
   window.location.href = data[0];
 }}
   </script>
 </head>
-<body onload=\"redirectLol()\">
+<body onload='redirectLol()'>
 <body>
 </html>",
         serde_json::to_string(links).context("Unable to convert links to string")?,
