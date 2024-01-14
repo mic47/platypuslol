@@ -131,15 +131,19 @@ fn query_params(req: &Request<Body>) -> HashMap<String, String> {
         .unwrap_or_default()
 }
 
-fn redirect(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Response<Body>> {
+fn redirect(
+    req: Request<Body>,
+    state: Arc<CommonAppState>,
+    last_parsing_error: LastParsingError,
+) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
     if let Some(query) = p.get("q") {
         if let Some(link) = state.redirect(query) {
             return redirect_response(&link);
         }
-        return list(req, state, Some(query));
+        return list(req, state, last_parsing_error, Some(query));
     }
-    list(req, state, None)
+    list(req, state, last_parsing_error, None)
 }
 
 fn local(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Response<Body>> {
@@ -164,6 +168,7 @@ fn add_key_class(class: Option<String>, item: html_builder::Node) -> html_builde
 fn list(
     req: Request<Body>,
     state: Arc<CommonAppState>,
+    last_parsing_error: LastParsingError,
     failed_query: Option<&str>,
 ) -> anyhow::Result<Response<Body>> {
     let mut failed_matches = vec![];
@@ -281,18 +286,27 @@ fn list(
             )?;
         }
     }
+    if let Some(error) = last_parsing_error.as_ref() {
+        writeln!(
+            body.h2(),
+            "Unable to load config, using old one. Last error:"
+        )?;
+        writeln!(body.pre(), "{:?}", error,)?;
+    }
     to_string_response(buf.finish(), ContentType::Html)
 }
 
 fn route(
     req: Request<Body>,
     state: Arc<RwLock<Arc<CommonAppState>>>,
+    last_parsing_error: Arc<RwLock<LastParsingError>>,
     template_variables: HashMap<String, String>,
 ) -> Result<Response<Body>, Infallible> {
     let method = req.method();
     let path = req.uri().path();
     let path = path.strip_suffix('/').unwrap_or(path);
     let state: Arc<CommonAppState> = { state.read().unwrap().clone() };
+    let last_parsing_error: LastParsingError = { last_parsing_error.read().unwrap().clone() };
     Ok((match (method, path) {
         (&Method::GET, "") | (&Method::GET, "/install") => templated_string_response(
             INSTALL_INSTRUCTIONS.into(),
@@ -304,9 +318,9 @@ fn route(
             &template_variables,
             ContentType::OpenSearchDescription,
         ),
-        (&Method::GET, "/list") => list(req, state, None),
+        (&Method::GET, "/list") => list(req, state, last_parsing_error, None),
         (&Method::GET, "/debug") => debug(req, state),
-        (&Method::GET, "/redirect") => redirect(req, state),
+        (&Method::GET, "/redirect") => redirect(req, state, last_parsing_error),
         (&Method::GET, "/config") => local(req, state),
         (&Method::GET, "/suggest") => suggest(req, state),
         (_, path) => {
@@ -581,9 +595,12 @@ async fn load_config(config_path: &Path) -> anyhow::Result<Arc<CommonAppState>> 
         .map(Arc::new)
 }
 
+type LastParsingError = Arc<Option<anyhow::Error>>;
+
 fn config_watcher(
     path: PathBuf,
     state: Arc<RwLock<Arc<CommonAppState>>>,
+    last_parsing_error: Arc<RwLock<LastParsingError>>,
 ) -> anyhow::Result<INotifyWatcher> {
     let watcher_path = path.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
@@ -602,10 +619,14 @@ fn config_watcher(
                                 Ok(new_parser) => {
                                     let mut parser = state.write().unwrap();
                                     *parser = new_parser;
+                                    let mut last_error = last_parsing_error.write().unwrap();
+                                    *last_error = Arc::new(None);
                                     eprintln!("Config is reloaded {:?}", &path);
                                 }
                                 Err(err) => {
+                                    let mut last_error = last_parsing_error.write().unwrap();
                                     eprintln!("Unable to load config: {err}");
+                                    *last_error = Arc::new(Some(err));
                                 }
                             };
                         })
@@ -634,17 +655,24 @@ async fn main() -> anyhow::Result<()> {
     eprintln!("Starting with following parameters {:#?}", cli);
 
     let parser = Arc::new(RwLock::new(load_config(&cli.link_config).await?));
+    let last_parsing_error = Arc::new(RwLock::new(Arc::new(None)));
 
-    let _watcher = config_watcher(cli.link_config.clone(), parser.clone())?;
+    let _watcher = config_watcher(
+        cli.link_config.clone(),
+        parser.clone(),
+        last_parsing_error.clone(),
+    )?;
     let default_server = format!("localhost:{}", cli.port);
     let default_protocol = "http://";
 
     let make_svc = make_service_fn(move |_conn| {
         let parser = parser.clone();
+        let last_parsing_error = last_parsing_error.clone();
         let default_server = default_server.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |req| {
                 let parser = parser.clone();
+                let last_parsing_error = last_parsing_error.clone();
                 let default_server = default_server.clone();
                 let server_uri = format!(
                     "{default_protocol}{}",
@@ -654,7 +682,7 @@ async fn main() -> anyhow::Result<()> {
                         .unwrap_or(&default_server)
                 );
                 let template_variables = HashMap::from([("{server}".into(), server_uri)]);
-                async { route(req, parser, template_variables) }
+                async { route(req, parser, last_parsing_error, template_variables) }
             }))
         }
     });
