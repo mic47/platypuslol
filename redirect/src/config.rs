@@ -61,6 +61,7 @@ fn default_none<T>() -> Option<T> {
 #[derive(Clone, Debug)]
 pub struct Config<T, R> {
     pub fallback: FallbackBehavior,
+    pub behavior: Behavior,
     pub redirects: RedirectConfig<T>,
     pub external_configurations: HashMap<ConfigUrl, ExternalParser<R>>,
 }
@@ -69,11 +70,13 @@ impl Config<String, ()> {
     pub fn from_config_file(config: ConfigFile<()>) -> Result<Self, String> {
         let ConfigFile {
             fallback,
+            behavior,
             redirects,
             external_configurations,
         } = config;
         Ok(Config {
             fallback,
+            behavior,
             redirects: RedirectConfig::from_config_file(redirects)?,
             external_configurations: external_configurations
                 .into_iter()
@@ -97,11 +100,13 @@ impl Config<String, RedirectConfig<String>> {
     pub fn from_config_file(config: ConfigFile<RedirectConfigFile>) -> Result<Self, String> {
         let ConfigFile {
             fallback,
+            behavior,
             redirects,
             external_configurations,
         } = config;
         Ok(Config {
             fallback,
+            behavior,
             redirects: RedirectConfig::from_config_file(redirects)?,
             external_configurations: external_configurations
                 .into_iter()
@@ -158,6 +163,8 @@ impl RedirectConfig<String> {
 pub struct ConfigFile<R> {
     pub fallback: FallbackBehavior,
     #[serde(flatten)]
+    pub behavior: Behavior,
+    #[serde(flatten)]
     pub redirects: RedirectConfigFile,
     pub external_configurations: HashMap<ConfigUrl, ExternalParserFile<R>>, // TODO
 }
@@ -199,6 +206,11 @@ pub struct FallbackBehavior {
     pub link: String,
     pub redirect_automatically: bool,
     pub query_prefix: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Behavior {
+    pub pick_first_in_conflict: bool,
 }
 
 impl FallbackBehavior {

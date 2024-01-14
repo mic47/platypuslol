@@ -177,7 +177,7 @@ fn list(
             .map(|x| resolve_parsed_output(x, &None))
             .next()
         {
-            failed_matches.push((p.description, Some(p.links)));
+            failed_matches.push((p.description, Some(p.links), Some(p.score)));
         }
     }
     let mut available_key_classes = "fjdkslahgrueiwoqptyvncmxbz1234567890"
@@ -201,7 +201,7 @@ fn list(
         .into_iter()
         .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
     {
-        matches.push((p.description, Some(p.links)))
+        matches.push((p.description, Some(p.links), Some(p.score)))
     }
     let mut visited: HashSet<_> = HashSet::default();
     for s in suggested
@@ -211,9 +211,9 @@ fn list(
         if !visited.insert(s.clone()) {
             continue;
         }
-        matches.push((s.description, s.links))
+        matches.push((s.description, s.links, None))
     }
-    matches.sort();
+    matches.sort_by_key(|(x0, x1, _)| (x0.clone(), x1.clone()));
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
@@ -227,7 +227,7 @@ fn list(
         writeln!(body.h1(), "List of All Commands")?;
     }
     let mut list = body.ul();
-    for (description, links) in failed_matches.into_iter().chain(matches.into_iter()) {
+    for (description, links, score) in failed_matches.into_iter().chain(matches.into_iter()) {
         if let Some(links) = links {
             if let [link] = &links[..] {
                 let maybe_key = available_key_classes.next();
@@ -237,9 +237,12 @@ fn list(
                         maybe_key.clone().map(|x| x.1),
                         list.li().a().attr(&format!("href='{}'", link))
                     ),
-                    "{}{}",
+                    "{}{}{}",
                     maybe_key.map(|x| x.0).unwrap_or_default(),
                     description,
+                    score
+                        .map(|score| format!(" {{{score}}}"))
+                        .unwrap_or_default(),
                 )?;
             } else {
                 let mut li = list.li();
@@ -247,9 +250,12 @@ fn list(
                 let maybe_key = available_key_classes.next();
                 writeln!(
                     div,
-                    "{}{}",
+                    "{}{}{}",
                     maybe_key.clone().map(|x| x.0).unwrap_or_default(),
-                    description
+                    description,
+                    score
+                        .map(|score| format!(" {{{score}}}"))
+                        .unwrap_or_default(),
                 )?;
                 let mut ul = div.ul();
                 for link in links {
@@ -265,7 +271,14 @@ fn list(
                 }
             }
         } else {
-            writeln!(list.li(), "{}", description,)?;
+            writeln!(
+                list.li(),
+                "{}{}",
+                description,
+                score
+                    .map(|score| format!(" {{{score}}}"))
+                    .unwrap_or_default(),
+            )?;
         }
     }
     to_string_response(buf.finish(), ContentType::Html)
@@ -427,6 +440,7 @@ async fn load_fetch_and_parse_configs(
     // TODO: make sure error messages have line numbers / serde path
     let Config::<String, ()> {
         fallback,
+        behavior,
         redirects,
         external_configurations,
     } = Config::<String, ()>::from_config_file(
@@ -549,6 +563,7 @@ async fn load_fetch_and_parse_configs(
     Ok((
         Config {
             fallback,
+            behavior,
             redirects,
             external_configurations: external_configurations?,
         },

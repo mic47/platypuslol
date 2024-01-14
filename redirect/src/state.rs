@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use nfa::NFA;
 
 use crate::{
-    create_parser, resolve_parsed_output, Config, ConfigLinkQuery, ConfigUrl, FallbackBehavior,
-    LinkToken, QueryToken, RedirectConfig,
+    create_parser, resolve_parsed_output, Behavior, Config, ConfigLinkQuery, ConfigUrl,
+    FallbackBehavior, LinkToken, QueryToken, RedirectConfig,
 };
 
 pub struct Fallback {
@@ -14,6 +14,7 @@ pub struct Fallback {
 
 pub struct CommonAppState {
     pub fallback: Fallback,
+    pub behavior: Behavior,
     pub parser: NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     pub local_configs: HashMap<String, String>,
 }
@@ -25,6 +26,7 @@ impl CommonAppState {
     ) -> Result<Self, String> {
         let Config {
             fallback,
+            behavior,
             redirects,
             external_configurations,
         } = loaded_config;
@@ -71,6 +73,7 @@ impl CommonAppState {
         }
         Ok(CommonAppState {
             parser: NFA::any_of(&parsers),
+            behavior,
             local_configs,
             fallback: Fallback {
                 behavior: fallback.clone(),
@@ -105,6 +108,9 @@ impl CommonAppState {
         ];
         for (query, parser) in parsers.into_iter().flatten() {
             let (parsed, _) = parser.parse_full_and_suggest(&query);
+            if !self.behavior.pick_first_in_conflict && parsed.len() > 1 {
+                return None;
+            }
             if let Some(p) = parsed
                 .into_iter()
                 .map(|x| resolve_parsed_output(x, &None))

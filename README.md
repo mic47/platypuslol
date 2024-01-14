@@ -53,7 +53,7 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [x] Test for 2 different substitutions of same type
 - [x] Make default and extra config (multiple config files possible)
 - [x] Add possible to have local files
-- [ ] keyboard shortcut for list page if possible to fill
+- [x] keyboard shortcut for list page if possible to fill
 - [ ] Check for html escapes and so on from links redirects
 - [ ] Remove unwraps, handle errors properly everywhere
 - [ ] Better validation errors and documentation
