@@ -210,6 +210,7 @@ pub struct FallbackBehavior {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Behavior {
+    #[serde(default)]
     pub pick_first_in_conflict: bool,
 }
 
