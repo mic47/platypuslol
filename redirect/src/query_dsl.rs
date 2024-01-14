@@ -121,15 +121,20 @@ impl LinkToken {
     }
 }
 
-pub fn parse_query(input: &str) -> Result<Vec<QueryToken>, String> {
+pub fn parse_query(input: &str, exact: bool) -> Result<Vec<QueryToken>, String> {
     split_by_braces(input)?
         .into_iter()
         .flat_map(|item| {
             if let Some(braces) = parse_braces(item) {
                 vec![QueryToken::new(&braces)]
             } else {
+                let constructor = if exact {
+                    QueryToken::Exact
+                } else {
+                    QueryToken::Prefix
+                };
                 item.split_whitespace()
-                    .map(|x| Ok(QueryToken::Prefix(x.into())))
+                    .map(|x| Ok(constructor(x.into())))
                     .collect()
             }
         })

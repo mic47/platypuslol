@@ -80,6 +80,7 @@ impl CommonAppState {
                 parser: create_parser(
                     vec![ConfigLinkQuery {
                         query: fallback.make_query("{query:query}"),
+                        exact: false,
                         links: vec![fallback.link],
                     }],
                     Default::default(),

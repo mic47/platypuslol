@@ -9,6 +9,7 @@ use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 pub struct ConfigLinkQuery<L> {
     pub query: String,
     pub links: Vec<L>,
+    pub exact: bool,
 }
 
 impl<L: Clone> ConfigLinkQuery<L> {
@@ -16,6 +17,7 @@ impl<L: Clone> ConfigLinkQuery<L> {
         Self {
             query: format!("{} {}", prefix, &self.query),
             links: self.links.clone(),
+            exact: self.exact,
         }
     }
 }
@@ -31,7 +33,7 @@ pub fn create_parser(
             // TODO: replace screw up suggestions
             .map(|c| {
                 // TODO: handle errors here
-                let sentence = parse_query(&c.query)?;
+                let sentence = parse_query(&c.query, c.exact)?;
                 let links = c
                     .links
                     .iter()
@@ -43,6 +45,7 @@ pub fn create_parser(
                     .collect::<Result<Vec<_>, _>>()?;
                 let c = ConfigLinkQuery {
                     query: c.query,
+                    exact: c.exact,
                     links,
                 };
                 let mut prev = None;

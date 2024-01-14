@@ -151,6 +151,7 @@ impl RedirectConfig<String> {
                         Ok(ConfigLinkQuery {
                             query: x.query,
                             links,
+                            exact: x.exact,
                         })
                     }
                 })
@@ -195,6 +196,8 @@ pub struct ConfigLinkQueryFile {
     pub links: Vec<String>,
     #[serde(default = "default_none")]
     pub link: Option<String>,
+    #[serde(default)]
+    pub exact: bool,
 }
 
 fn default_empty<T>() -> Vec<T> {
