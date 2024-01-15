@@ -182,7 +182,7 @@ fn list(
             .map(|x| resolve_parsed_output(x, &None))
             .next()
         {
-            failed_matches.push((p.description, Some(p.links), Some(p.score)));
+            failed_matches.push((p.description, Some(p.links)));
         }
     }
     let mut available_key_classes = "fjdkslahgrueiwoqptyvncmxbz1234567890"
@@ -206,7 +206,7 @@ fn list(
         .into_iter()
         .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
     {
-        matches.push((p.description, Some(p.links), Some(p.score)))
+        matches.push((p.description, Some(p.links)))
     }
     let mut visited: HashSet<_> = HashSet::default();
     for s in suggested
@@ -216,9 +216,10 @@ fn list(
         if !visited.insert(s.clone()) {
             continue;
         }
-        matches.push((s.description, s.links, None))
+        matches.push((s.description, s.links))
     }
-    matches.sort_by_key(|(x0, x1, _)| (x0.clone(), x1.clone()));
+    let first = matches.first().cloned();
+    matches.sort();
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
@@ -232,7 +233,13 @@ fn list(
         writeln!(body.h1(), "List of All Commands")?;
     }
     let mut list = body.ul();
-    for (description, links, score) in failed_matches.into_iter().chain(matches.into_iter()) {
+    let mut is_first = true;
+    for (description, links) in first
+        .into_iter()
+        .chain(failed_matches.into_iter().chain(matches.into_iter()))
+    {
+        let suffix_text = if is_first { " <- Top pick" } else { "" };
+        is_first = false;
         if let Some(links) = links {
             if let [link] = &links[..] {
                 let maybe_key = available_key_classes.next();
@@ -245,9 +252,7 @@ fn list(
                     "{}{}{}",
                     maybe_key.map(|x| x.0).unwrap_or_default(),
                     description,
-                    score
-                        .map(|score| format!(" {{{score}}}"))
-                        .unwrap_or_default(),
+                    suffix_text,
                 )?;
             } else {
                 let mut li = list.li();
@@ -258,9 +263,7 @@ fn list(
                     "{}{}{}",
                     maybe_key.clone().map(|x| x.0).unwrap_or_default(),
                     description,
-                    score
-                        .map(|score| format!(" {{{score}}}"))
-                        .unwrap_or_default(),
+                    suffix_text,
                 )?;
                 let mut ul = div.ul();
                 for link in links {
@@ -276,14 +279,7 @@ fn list(
                 }
             }
         } else {
-            writeln!(
-                list.li(),
-                "{}{}",
-                description,
-                score
-                    .map(|score| format!(" {{{score}}}"))
-                    .unwrap_or_default(),
-            )?;
+            writeln!(list.li(), "{}", description,)?;
         }
     }
     if let Some(error) = last_parsing_error.as_ref() {
