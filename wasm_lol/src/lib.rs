@@ -30,7 +30,7 @@ impl ExtensionParser {
                 score: _,
                 links,
                 description,
-            } = resolve_parsed_output(p, &None);
+            } = resolve_parsed_output(p, &None).0;
             output.push(Suggestion {
                 text: description,
                 links,
@@ -38,7 +38,7 @@ impl ExtensionParser {
         }
         let mut visited: HashSet<_> = HashSet::default();
         for s in suggestions.into_iter() {
-            let s = resolve_suggestion_output(s, &None);
+            let s = resolve_suggestion_output(s, &None).0;
             if visited.insert(s.clone()) {
                 output.push(Suggestion {
                     text: s.description,

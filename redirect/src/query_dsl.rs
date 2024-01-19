@@ -75,7 +75,7 @@ fn parse_braces(input: &str) -> Option<Vec<&str>> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum QueryToken {
     Exact(String),
     Prefix(String),

@@ -6,16 +6,17 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use anyhow::Context;
-use html_builder::{Buffer, Html5};
+use html_builder::{Buffer, Html5, Node};
 use hyper::body::Buf;
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
+use itertools::Itertools;
 use notify::{Event, INotifyWatcher, RecursiveMode, Watcher};
 
 use redirect::{
     resolve_parsed_output, resolve_suggestion_output, CommonAppState, Config, ConfigUrl,
-    ExternalParser, RedirectConfig,
+    ExternalParser, QueryToken, RedirectConfig, ResolvedOutputMetadata,
 };
 use tokio::runtime::Runtime;
 
@@ -53,11 +54,11 @@ fn debug(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Respo
         let (parsed, suggested) = state.parser.parse_full_and_suggest(query);
         let parsed: Vec<_> = parsed
             .into_iter()
-            .map(|x| resolve_parsed_output(x, &None))
+            .map(|x| resolve_parsed_output(x, &None).0)
             .collect();
         let suggested: Vec<_> = suggested
             .into_iter()
-            .map(|x| resolve_suggestion_output(x, &None))
+            .map(|x| resolve_suggestion_output(x, &None).0)
             .collect();
         return to_string_response(
             serde_json::to_value((parsed, suggested)).context("Unable to serialize to json")?,
@@ -75,7 +76,10 @@ fn suggest(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Res
         let mut suggested_queries: Vec<String> = vec![];
         let mut suggested_texts: Vec<String> = vec![];
         let mut suggested_urls: Vec<String> = vec![];
-        for p in parsed.into_iter().map(|x| resolve_parsed_output(x, &None)) {
+        for p in parsed
+            .into_iter()
+            .map(|x| resolve_parsed_output(x, &None).0)
+        {
             suggested_texts.push(format!("{} => {:?}", p.description, p.links));
             suggested_queries.push(p.description.clone());
             if let [link] = &p.links[..] {
@@ -91,7 +95,7 @@ fn suggest(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Res
         let mut visited: HashSet<_> = HashSet::default();
         for s in suggested
             .into_iter()
-            .map(|x| resolve_suggestion_output(x, &None))
+            .map(|x| resolve_suggestion_output(x, &None).0)
         {
             if !visited.insert(s.clone()) {
                 continue;
@@ -157,12 +161,135 @@ fn local(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Respo
     Err(anyhow::anyhow!("Missing parameter file"))
 }
 
-fn add_key_class(class: Option<String>, item: html_builder::Node) -> html_builder::Node {
+fn add_key_class(class: Option<String>, parent: String, item: Node) -> Node {
     if let Some(class) = class {
-        item.attr(&format!("class='{}'", class))
+        item.attr(&format!(
+            "class='toogable onpress{} onparent{}'",
+            class, parent
+        ))
     } else {
         item
     }
+}
+
+enum NestedList<I, T> {
+    Element(T),
+    Items(I, Vec<NestedList<I, T>>),
+}
+
+fn character_iterator(
+    total: usize,
+    css_prefix: String,
+) -> Box<dyn Iterator<Item = (String, String)>> {
+    let chars = "fjdksla"; //"hgrueiwoqptyvncmxbz1234567890";
+    let mut out = chars.chars().map(|c| c.to_string()).collect::<Vec<_>>();
+    while out.len() < total {
+        out = out
+            .into_iter()
+            .flat_map(|s| {
+                chars
+                    .chars()
+                    .map(|c| format!("{}{}", s, c))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+    }
+
+    Box::new(
+        out.into_iter()
+            .map(move |c| (format!("[{}] ", c), format!("{}{}", css_prefix, c))),
+    )
+}
+
+fn list_nest<I: Iterator<Item = (String, String)>>(
+    available_key_classes: &mut I,
+    css_prefix: String,
+    list: &mut Node,
+    elements: NestedList<
+        Vec<QueryToken>,
+        (String, Option<Vec<String>>, ResolvedOutputMetadata, &str),
+    >,
+) -> anyhow::Result<()> {
+    match elements {
+        NestedList::Element((description, links, _meta, suffix_text)) => {
+            if let Some(links) = links {
+                if let [link] = &links[..] {
+                    let maybe_key = available_key_classes.next();
+                    writeln!(
+                        // TODO: escape link?
+                        add_key_class(
+                            maybe_key.clone().map(|x| x.1),
+                            css_prefix,
+                            list.li().a().attr(&format!("href='{}'", link))
+                        ),
+                        "{}{}{}",
+                        maybe_key.map(|x| x.0).unwrap_or_default(),
+                        description,
+                        suffix_text,
+                    )?;
+                } else {
+                    let mut li = list.li();
+                    let maybe_key = available_key_classes.next();
+                    let mut div = add_key_class(maybe_key.clone().map(|x| x.1), css_prefix.clone(), li.span());
+                    writeln!(
+                        div,
+                        "{}{}{}",
+                        maybe_key.clone().map(|x| x.0).unwrap_or_default(),
+                        description,
+                        suffix_text,
+                    )?;
+                    let mut ul = div.ul();
+                    for link in links {
+                        writeln!(
+                            // TODO: escape link?
+                            add_key_class(
+                                maybe_key.clone().map(|x| x.1),
+                                css_prefix.clone(),
+                                ul.li().a().attr(&format!("href='{}'", link))
+                            ),
+                            "{}",
+                            link,
+                        )?;
+                    }
+                }
+            } else {
+                writeln!(list.li(), "{}", description,)?;
+            }
+        }
+        NestedList::Items(group, items) => {
+            let mut li = list.li();
+            let maybe_key = available_key_classes.next();
+            let mut available_key_classes = character_iterator(
+                items.len(),
+                format!("{}{}", &css_prefix, maybe_key.clone().unwrap_or_default().1),
+            );
+            let span = li.span();
+            writeln!(
+                add_key_class(maybe_key.clone().map(|x| x.1), css_prefix.clone(), span),
+                "{}{}",
+                maybe_key.clone().map(|x| x.0).unwrap_or_default(),
+                group
+                    .into_iter()
+                    .map(|x| match x {
+                        redirect::QueryToken::Exact(x) => x,
+                        redirect::QueryToken::Prefix(x) => x,
+                        redirect::QueryToken::Regex(x, _) => x,
+                        redirect::QueryToken::Substitution(x, _, _) => format!("<{x}>"),
+                    })
+                    .join(" ")
+            )?;
+            let mut ul = li.ul();
+            for item in items.into_iter() {
+                list_nest(
+                    &mut available_key_classes,
+                    maybe_key.clone().map(|x| x.1).unwrap_or_default(),
+                    &mut ul,
+                    item,
+                )?;
+            }
+        }
+    };
+    Ok(())
 }
 
 fn list(
@@ -177,17 +304,14 @@ fn list(
             .fallback
             .parser
             .parse_full_and_suggest(&state.fallback.behavior.make_query(failed_query));
-        if let Some(p) = parsed
+        if let Some((p, meta)) = parsed
             .into_iter()
             .map(|x| resolve_parsed_output(x, &None))
             .next()
         {
-            failed_matches.push((p.description, Some(p.links)));
+            failed_matches.push((p.description, Some(p.links), meta));
         }
     }
-    let mut available_key_classes = "fjdkslahgrueiwoqptyvncmxbz1234567890"
-        .chars()
-        .map(|c| (format!("[{}] ", c), format!("onpress{}", c)));
 
     let p = query_params(&req);
     let (used_query, (parsed, suggested)) = p
@@ -202,24 +326,24 @@ fn list(
         })
         .unwrap_or_else(|| (None, state.parser.parse_full_and_suggest("")));
     let mut matches = vec![];
-    for p in parsed
+    for (p, meta) in parsed
         .into_iter()
         .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
     {
-        matches.push((p.description, Some(p.links)))
+        matches.push((p.description, Some(p.links), meta))
     }
     let mut visited: HashSet<_> = HashSet::default();
-    for s in suggested
+    for (s, meta) in suggested
         .into_iter()
         .map(|x| resolve_suggestion_output(x, &failed_query.map(Into::into)))
     {
         if !visited.insert(s.clone()) {
             continue;
         }
-        matches.push((s.description, s.links))
+        matches.push((s.description, s.links, meta))
     }
     let first = matches.first().cloned();
-    matches.sort();
+    matches.sort_by_key(|(x0, x1, _)| (x0.clone(), x1.clone()));
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
@@ -232,54 +356,48 @@ fn list(
     } else {
         writeln!(body.h1(), "List of All Commands")?;
     }
+    let mut div = body.div();
+    writeln!(div, "Typed text: ")?;
+    div.span().attr("id='query'");
     let mut list = body.ul();
     let mut is_first = true;
-    for (description, links) in first
+    let grouped = first
         .into_iter()
         .chain(failed_matches.into_iter().chain(matches.into_iter()))
-    {
-        let suffix_text = if is_first { " <- Top pick" } else { "" };
-        is_first = false;
-        if let Some(links) = links {
-            if let [link] = &links[..] {
-                let maybe_key = available_key_classes.next();
-                writeln!(
-                    // TODO: escape link?
-                    add_key_class(
-                        maybe_key.clone().map(|x| x.1),
-                        list.li().a().attr(&format!("href='{}'", link))
-                    ),
-                    "{}{}{}",
-                    maybe_key.map(|x| x.0).unwrap_or_default(),
-                    description,
-                    suffix_text,
-                )?;
-            } else {
-                let mut li = list.li();
-                let mut div = li.span();
-                let maybe_key = available_key_classes.next();
-                writeln!(
-                    div,
-                    "{}{}{}",
-                    maybe_key.clone().map(|x| x.0).unwrap_or_default(),
-                    description,
-                    suffix_text,
-                )?;
-                let mut ul = div.ul();
-                for link in links {
-                    writeln!(
-                        // TODO: escape link?
-                        add_key_class(
-                            maybe_key.clone().map(|x| x.1),
-                            ul.li().a().attr(&format!("href='{}'", link))
-                        ),
-                        "{}",
-                        link,
-                    )?;
-                }
-            }
+        .group_by(|x| x.2.command.clone());
+    let grouped = grouped.into_iter().collect::<Vec<_>>();
+
+    let mut available_key_classes = character_iterator(grouped.len(), "".into());
+    for group in grouped.into_iter() {
+        let group_list = group.1.collect::<Vec<_>>();
+        if group_list.len() == 1 {
+            let mut group_list = group_list;
+            let suffix_text = if is_first { " <- Top pick" } else { "" };
+            is_first = false;
+            let (a, b, c) = group_list.pop().unwrap();
+            list_nest(
+                &mut available_key_classes,
+                "".into(),
+                &mut list,
+                NestedList::Element((a, b, c, suffix_text)),
+            )?;
         } else {
-            writeln!(list.li(), "{}", description,)?;
+            list_nest(
+                &mut available_key_classes,
+                "".into(),
+                &mut list,
+                NestedList::Items(
+                    group.0,
+                    group_list
+                        .into_iter()
+                        .map(|(a, b, c)| {
+                            let suffix_text = if is_first { " <- Top pick" } else { "" };
+                            is_first = false;
+                            NestedList::Element((a, b, c, suffix_text))
+                        })
+                        .collect(),
+                ),
+            )?;
         }
     }
     if let Some(error) = last_parsing_error.as_ref() {

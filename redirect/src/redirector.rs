@@ -104,11 +104,18 @@ pub fn create_parser(
     ))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct ResolvedParsedOutput {
     pub score: f64,
     pub links: Vec<String>,
     pub description: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ResolvedOutputMetadata {
+    pub command: Vec<QueryToken>,
+    pub query: HashMap<String, String>,
+    pub substitutions: HashMap<String, HashMap<String, String>>,
 }
 
 type Sentence = Vec<LinkToken>;
@@ -142,23 +149,32 @@ fn process_trace(
 pub fn resolve_parsed_output(
     p: Parsed<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     default_replacement: &Option<String>,
-) -> ResolvedParsedOutput {
+) -> (ResolvedParsedOutput, ResolvedOutputMetadata) {
     let (matches, substitutions) = process_trace(p.trace);
-    ResolvedParsedOutput {
-        score: p.score,
-        links: p
-            .payload
-            .0
-            .iter()
-            .map(|payload| process_query(&matches, &substitutions, payload, default_replacement))
-            .collect(),
-        description: process_suggestion(
-            &matches,
-            &substitutions,
-            &p.payload.1,
-            default_replacement,
-        ),
-    }
+    (
+        ResolvedParsedOutput {
+            score: p.score,
+            links: p
+                .payload
+                .0
+                .iter()
+                .map(|payload| {
+                    process_query(&matches, &substitutions, payload, default_replacement)
+                })
+                .collect(),
+            description: process_suggestion(
+                &matches,
+                &substitutions,
+                &p.payload.1,
+                default_replacement,
+            ),
+        },
+        ResolvedOutputMetadata {
+            command: p.payload.1.clone(),
+            query: matches,
+            substitutions,
+        },
+    )
 }
 
 fn process_query(
@@ -233,18 +249,28 @@ pub struct ResolvedSuggestionOutput {
 pub fn resolve_suggestion_output(
     suggestion: Suggestion<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     default_replacement: &Option<String>,
-) -> ResolvedSuggestionOutput {
+) -> (ResolvedSuggestionOutput, ResolvedOutputMetadata) {
     let (matches, substitutions) = process_trace(suggestion.trace);
-    ResolvedSuggestionOutput {
-        description: suggestion
-            .payload
-            .as_ref()
-            .map(|x| process_suggestion(&matches, &substitutions, &x.1, default_replacement))
-            .unwrap_or(suggestion.suggestion),
-        links: suggestion.payload.as_ref().map(|x| {
-            x.0.iter()
-                .map(|link| process_query(&matches, &substitutions, link, default_replacement))
-                .collect()
-        }),
-    }
+    (
+        ResolvedSuggestionOutput {
+            description: suggestion
+                .payload
+                .as_ref()
+                .map(|x| process_suggestion(&matches, &substitutions, &x.1, default_replacement))
+                .unwrap_or(suggestion.suggestion.clone()),
+            links: suggestion.payload.as_ref().map(|x| {
+                x.0.iter()
+                    .map(|link| process_query(&matches, &substitutions, link, default_replacement))
+                    .collect()
+            }),
+        },
+        ResolvedOutputMetadata {
+            command: suggestion
+                .payload.clone()
+                .map(|x| x.1)
+                .unwrap_or_else(|| vec![QueryToken::Exact(suggestion.suggestion.clone())]),
+            query: matches,
+            substitutions,
+        },
+    )
 }

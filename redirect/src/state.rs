@@ -112,7 +112,7 @@ impl CommonAppState {
             if !self.behavior.pick_first_in_conflict && parsed.len() > 1 {
                 return None;
             }
-            if let Some(p) = parsed
+            if let Some((p, _)) = parsed
                 .into_iter()
                 .map(|x| resolve_parsed_output(x, &None))
                 .next()

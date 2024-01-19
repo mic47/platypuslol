@@ -28,20 +28,31 @@ pub fn main() {
     let parser = create_parser(config.redirects, config.substitutions).unwrap();
     let (parsed, suggested) = parser.parse_full_and_suggest(&cli.query);
     for p in parsed.into_iter() {
-        let ResolvedParsedOutput {
-            score,
-            links,
-            description,
-        } = resolve_parsed_output(p, &None);
+        let (
+            ResolvedParsedOutput {
+                score,
+                links,
+                description,
+            },
+            metadata,
+        ) = resolve_parsed_output(p, &None);
         //link = link.replace(&data.identifier, &data.payload.replace(" ", "+"));
         //println!("{:#?}", p);
-        println!("{:10.5}: '{}', {:#?}", score, description, links);
+        println!(
+            "{:10.5}: '{}', {:#?}, {:?}",
+            score, description, links, metadata
+        );
     }
     let mut visited: HashSet<_> = HashSet::default();
     for s in suggested.into_iter() {
-        let s = resolve_suggestion_output(s, &None);
+        let (s, m) = resolve_suggestion_output(s, &None);
         if visited.insert(s.clone()) {
-            println!("{}: {:?}", s.description, s.links.unwrap_or_default());
+            println!(
+                "{}: {:?} {:?}",
+                s.description,
+                s.links.unwrap_or_default(),
+                m
+            );
         }
     }
 }

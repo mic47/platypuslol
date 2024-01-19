@@ -22,3 +22,4 @@ tokio.workspace = true
 clap.workspace = true
 url.workspace = true
 lazy_static.workspace = true
+itertools = "0.12.0"
