@@ -516,6 +516,9 @@ dependencies = [
 [[package]]
 name = "nfa"
 version = "0.1.0"
+dependencies = [
+ "itertools",
+]
 
 [[package]]
 name = "notify"

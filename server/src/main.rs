@@ -201,6 +201,7 @@ fn character_iterator(
     )
 }
 
+#[allow(clippy::type_complexity)]
 fn list_nest<I: Iterator<Item = (String, String)>>(
     available_key_classes: &mut I,
     css_prefix: String,
@@ -230,7 +231,11 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                 } else {
                     let mut li = list.li();
                     let maybe_key = available_key_classes.next();
-                    let mut div = add_key_class(maybe_key.clone().map(|x| x.1), css_prefix.clone(), li.span());
+                    let mut div = add_key_class(
+                        maybe_key.clone().map(|x| x.1),
+                        css_prefix.clone(),
+                        li.span(),
+                    );
                     writeln!(
                         div,
                         "{}{}{}",
@@ -363,7 +368,7 @@ fn list(
     let mut is_first = true;
     let grouped = first
         .into_iter()
-        .chain(failed_matches.into_iter().chain(matches.into_iter()))
+        .chain(failed_matches.into_iter().chain(matches))
         .group_by(|x| x.2.command.clone());
     let grouped = grouped.into_iter().collect::<Vec<_>>();
 

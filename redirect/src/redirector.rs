@@ -266,7 +266,8 @@ pub fn resolve_suggestion_output(
         },
         ResolvedOutputMetadata {
             command: suggestion
-                .payload.clone()
+                .payload
+                .clone()
                 .map(|x| x.1)
                 .unwrap_or_else(|| vec![QueryToken::Exact(suggestion.suggestion.clone())]),
             query: matches,

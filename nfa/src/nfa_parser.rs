@@ -3,6 +3,8 @@ use std::{
     collections::{HashMap, HashSet, VecDeque},
 };
 
+use itertools::Itertools;
+
 use crate::Regex;
 
 type Length = usize;
@@ -62,7 +64,7 @@ pub enum EdgeData {
     Substitution(HashMap<String, String>),
 }
 
-impl<T> Node<T> {
+impl<T: std::fmt::Debug> Node<T> {
     pub fn with_payload_for_final<R: Clone>(self, payload: &R) -> Node<R> {
         Node {
             payload: if self.is_final {
@@ -199,27 +201,32 @@ impl<T> Node<T> {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn get_suggestions(&self) -> Vec<(&String, &Vec<NodeIndex>, Option<Trace<&T>>)> {
+    pub fn get_suggestions(&self) -> Vec<(Vec<(&str, Option<Trace<&T>>)>, &Vec<NodeIndex>)> {
         let normal_edges = self
             .normal_edges
             .values()
             .flat_map(|x| x.iter())
-            .map(|(a, b)| (a, b, None));
+            .map(|(a, b)| (vec![(a.as_str(), None)], b));
         let regex_edges = self
             .regex_edges
             .iter()
-            .map(|x| (&x.suggestion, &x.target, None)); // TODO?
-        let substitution_edges = self.substitution_edges.iter().flat_map(|x| {
-            x.needles.iter().map(|(needle, subst)| {
-                (
-                    needle,
-                    &x.target,
-                    Some(Trace::Edge(WithIdentifier {
-                        identifier: x.identifier.clone(),
-                        payload: EdgeData::Substitution(subst.clone()),
-                    })),
-                )
-            })
+            .map(|x| (vec![(x.suggestion.as_str(), None)], &x.target)); // TODO?
+        let substitution_edges = self.substitution_edges.iter().map(|x| {
+            (
+                x.needles
+                    .iter()
+                    .map(|(needle, subst)| {
+                        (
+                            needle.as_str(),
+                            Some(Trace::Edge(WithIdentifier {
+                                identifier: x.identifier.clone(),
+                                payload: EdgeData::Substitution(subst.clone()),
+                            })),
+                        )
+                    })
+                    .collect(),
+                &x.target,
+            )
         });
         normal_edges
             .chain(regex_edges)
@@ -274,7 +281,7 @@ pub struct NFA<T> {
     pub root: NodeIndex,
 }
 
-impl<T> NFA<T> {
+impl<T: std::fmt::Debug> NFA<T> {
     pub fn with_payload_for_final_nodes<R: Clone>(self, payload: &R) -> NFA<R> {
         NFA {
             nodes: self
@@ -294,7 +301,7 @@ impl<T> NFA<T> {
     }
 }
 
-impl<T: Clone> NFA<T> {
+impl<T: Clone + std::fmt::Debug> NFA<T> {
     pub fn chain(nfas: &[NFA<T>]) -> NFA<T> {
         if nfas.is_empty() {
             return Self::nothing();
@@ -414,7 +421,7 @@ impl NFA<()> {
 
 type ParserOutputTuple<'a, 'b, T> = (&'a Node<T>, &'b str, f64, Option<WithIdentifier<EdgeData>>);
 
-impl<T> NFA<T> {
+impl<T: std::fmt::Debug> NFA<T> {
     pub fn nothing() -> NFA<T> {
         NFA {
             nodes: vec![Node::default()],
@@ -455,6 +462,58 @@ pub struct Suggestion<'a, T> {
     pub trace: Vec<Trace<&'a T>>,
 }
 
+#[allow(clippy::type_complexity)]
+#[derive(Clone, Debug)]
+struct BFSSuggestions<'a, T> {
+    pub node: &'a Node<T>,
+    pub suggestions_and_traces: Vec<Vec<(&'a str, Option<Trace<&'a T>>)>>,
+}
+
+impl<'a, T> BFSSuggestions<'a, T> {
+    pub fn get_suggestions(&self) -> Vec<Suggestion<'a, T>> {
+        let suggestions_and_traces = self
+            .suggestions_and_traces
+            .iter()
+            .filter(|x| !x.is_empty())
+            .collect::<Vec<_>>();
+        if suggestions_and_traces.is_empty() {
+            return vec![];
+        }
+        let mut output = vec![];
+        let mut stack: Vec<usize> = vec![0];
+        while let Some(top_index_position) = stack.last() {
+            let current_index = stack.len() - 1;
+            if *top_index_position >= suggestions_and_traces[current_index].len() {
+                stack.pop();
+                if !stack.is_empty() {
+                    let last = stack.len() - 1;
+                    stack[last] += 1;
+                }
+                continue;
+            }
+            while stack.len() < suggestions_and_traces.len() {
+                stack.push(0);
+            }
+            output.push(Suggestion {
+                payload: &self.node.payload,
+                suggestion: stack
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| suggestions_and_traces[index][*value].0)
+                    .join(" "),
+                trace: stack
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, value)| suggestions_and_traces[index][*value].1.clone())
+                    .collect(),
+            });
+            let last = stack.len() - 1;
+            stack[last] += 1;
+        }
+        output
+    }
+}
+
 impl<T: std::fmt::Debug> NFA<T> {
     pub fn parse_full<'a>(&'a self, input: &str) -> Vec<&'a T> {
         self.parse(input)
@@ -470,10 +529,17 @@ impl<T: std::fmt::Debug> NFA<T> {
         // TODO: collect payloads
         let mut state = VecDeque::from([(&self.nodes[self.root], input, 0., vec![])]);
         let mut output = vec![];
-        let mut suggestion_states: VecDeque<(_, Vec<&str>, Vec<_>)> = VecDeque::from([]);
+        let mut suggestion_states: VecDeque<BFSSuggestions<T>> = VecDeque::from([]);
         while let Some((node, string, score, mut payloads)) = state.pop_front() {
             if string.is_empty() {
-                suggestion_states.push_back((node, vec![], payloads.clone()))
+                suggestion_states.push_back(BFSSuggestions {
+                    node,
+                    suggestions_and_traces: vec![payloads
+                        .clone()
+                        .into_iter()
+                        .map(|p| ("", Some(p)))
+                        .collect()],
+                })
             }
             if let Some(ref payload) = node.payload {
                 payloads.push(Trace::Node(payload));
@@ -501,31 +567,21 @@ impl<T: std::fmt::Debug> NFA<T> {
         let mut suggestions = vec![];
         let mut visited: HashSet<NodeIndex> = Default::default();
         let mut skip_suggesting_until = suggestion_states.len();
-        while let Some((node, suggestion, trace)) = suggestion_states.pop_front() {
-            if node.is_final && skip_suggesting_until == 0 {
-                suggestions.push(Suggestion {
-                    suggestion: format!("{}{}", input, suggestion.join("")),
-                    payload: &node.payload,
-                    trace: trace.clone(),
-                })
+        while let Some(suggestion_state) = suggestion_states.pop_front() {
+            if suggestion_state.node.is_final && skip_suggesting_until == 0 {
+                suggestions.extend(suggestion_state.get_suggestions());
             }
             skip_suggesting_until = skip_suggesting_until.saturating_sub(1);
             let mut to_visit: HashSet<NodeIndex> = Default::default();
-            for (text, target_nodes, node_trace) in node.get_suggestions() {
+            for (texts_with_traces, target_nodes) in suggestion_state.node.get_suggestions() {
                 for target_node in target_nodes.iter().filter(|x| !visited.contains(*x)) {
-                    let trace = {
-                        if let Some(ref node_trace) = node_trace {
-                            let mut trace = trace.clone();
-                            trace.push(node_trace.clone());
-                            trace
-                        } else {
-                            trace.clone()
-                        }
-                    };
                     to_visit.insert(*target_node);
-                    let mut suggestion = suggestion.clone();
-                    suggestion.push(text);
-                    suggestion_states.push_back((&self.nodes[*target_node], suggestion, trace))
+                    let mut st = suggestion_state.suggestions_and_traces.clone();
+                    st.push(texts_with_traces.clone());
+                    suggestion_states.push_back(BFSSuggestions {
+                        node: &self.nodes[*target_node],
+                        suggestions_and_traces: st,
+                    });
                 }
             }
             visited.extend(to_visit);
