@@ -451,7 +451,6 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
                 counts.entry(i).or_default().insert(hsh);
             }
         }
-        println!("counts {:#?}", counts);
         let to_take = counts
             .into_iter()
             .filter_map(|(k, v)| if v.len() <= max_size { Some(k) } else { None })
