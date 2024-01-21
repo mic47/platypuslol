@@ -265,10 +265,8 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
         NestedList::Items(group, items) => {
             let mut li = list.li();
             let maybe_key = available_key_classes.next();
-            let mut available_key_classes = character_iterator(
-                items.len(),
-                format!("{}{}", &css_prefix, maybe_key.clone().unwrap_or_default().1),
-            );
+            let mut available_key_classes =
+                character_iterator(items.len(), maybe_key.clone().unwrap_or_default().1);
             let span = li.span();
             writeln!(
                 add_key_class(maybe_key.clone().map(|x| x.1), css_prefix.clone(), span),
@@ -454,38 +452,35 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
         let to_take = counts
             .into_iter()
             .filter_map(|(k, v)| if v.len() <= max_size { Some(k) } else { None })
-            .max();
-        if let Some(to_take) = to_take {
-            let mut out = vec![];
-            for (tokens, group) in list
-                .into_iter()
-                .group_by(|x| match x {
-                    NestedList::Element(item) => item
-                        .2
-                        .command
-                        .iter()
-                        .take(to_take + 1)
-                        .cloned()
-                        .collect::<Vec<_>>(),
-                    NestedList::Items(item, _) => {
-                        item.iter().take(to_take + 1).cloned().collect::<Vec<_>>()
-                    }
-                })
-                .into_iter()
-            {
-                let mut items = group.collect::<Vec<_>>();
-                if items.len() == 1 {
-                    if let Some(x) = items.pop() {
-                        out.push(x)
-                    }
-                } else {
-                    out.push(NestedList::Items(tokens, items));
+            .max()
+            .unwrap_or_default();
+        let mut out = vec![];
+        for (tokens, group) in list
+            .into_iter()
+            .group_by(|x| match x {
+                NestedList::Element(item) => item
+                    .2
+                    .command
+                    .iter()
+                    .take(to_take + 1)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                NestedList::Items(item, _) => {
+                    item.iter().take(to_take + 1).cloned().collect::<Vec<_>>()
                 }
+            })
+            .into_iter()
+        {
+            let mut items = group.collect::<Vec<_>>();
+            if items.len() == 1 {
+                if let Some(x) = items.pop() {
+                    out.push(x)
+                }
+            } else {
+                out.push(NestedList::Items(tokens, items));
             }
-            out
-        } else {
-            list
         }
+        out
     } else {
         list
     }

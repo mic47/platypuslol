@@ -34,7 +34,7 @@ function setVisibility(pressed) {
       if (onpress == undefined || onparent == undefined) {
         return;
       }
-      if (!onpress.startsWith(pre)) {
+      if (!onpress.startsWith(pre) && !pre.startsWith(onpress)) {
         el.parentElement.style.display = 'none';
         return
       }
