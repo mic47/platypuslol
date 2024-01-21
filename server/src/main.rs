@@ -177,17 +177,21 @@ enum NestedList<I, T> {
     Items(I, Vec<NestedList<I, T>>),
 }
 
+const FAST_SHORTCUT_CHARACTERS: &str = "fjdksla"; //"hgrueiwoqptyvncmxbz1234567890";
+
 fn character_iterator(
     total: usize,
     css_prefix: String,
 ) -> Box<dyn Iterator<Item = (String, String)>> {
-    let chars = "fjdksla"; //"hgrueiwoqptyvncmxbz1234567890";
-    let mut out = chars.chars().map(|c| c.to_string()).collect::<Vec<_>>();
+    let mut out = FAST_SHORTCUT_CHARACTERS
+        .chars()
+        .map(|c| c.to_string())
+        .collect::<Vec<_>>();
     while out.len() < total {
         out = out
             .into_iter()
             .flat_map(|s| {
-                chars
+                FAST_SHORTCUT_CHARACTERS
                     .chars()
                     .map(|c| format!("{}{}", s, c))
                     .collect::<Vec<_>>()
