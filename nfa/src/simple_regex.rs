@@ -1,6 +1,6 @@
 /// Lighter version regex::Regex, which does only subset of operations,
 /// but does not blew up wasm size.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Regex {
     Word,
     RestOfTheString,

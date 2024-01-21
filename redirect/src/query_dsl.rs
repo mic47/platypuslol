@@ -83,6 +83,32 @@ pub enum QueryToken {
     Substitution(String, String, String),
 }
 
+impl PartialOrd for QueryToken {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for QueryToken {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (QueryToken::Exact(left), QueryToken::Exact(right))
+            | (QueryToken::Exact(left), QueryToken::Prefix(right))
+            | (QueryToken::Prefix(left), QueryToken::Exact(right))
+            | (QueryToken::Prefix(left), QueryToken::Prefix(right)) => left.cmp(right),
+            (QueryToken::Regex(lefta, leftb), QueryToken::Regex(righta, rightb)) => {
+                (lefta, leftb).cmp(&(righta, rightb))
+            }
+            (QueryToken::Substitution(la, lb, lc), QueryToken::Substitution(ra, rb, rc)) => {
+                (la, lb, lc).cmp(&(ra, rb, rc))
+            }
+            (QueryToken::Exact(_), _) => std::cmp::Ordering::Less,
+            (QueryToken::Prefix(_), _) => std::cmp::Ordering::Less,
+            (QueryToken::Regex(_, _), _) => std::cmp::Ordering::Less,
+            (QueryToken::Substitution(_, _, _), _) => std::cmp::Ordering::Less,
+        }
+    }
+}
+
 impl QueryToken {
     fn new(tokens: &[&str]) -> Result<Self, String> {
         Ok(match tokens {

@@ -348,7 +348,7 @@ fn list(
         matches.push((s.description, s.links, meta))
     }
     let first = matches.first().cloned();
-    matches.sort_by_key(|(x0, x1, _)| (x0.clone(), x1.clone()));
+    matches.sort_by_key(|(x0, x1, meta)| (meta.command.clone(), x0.clone(), x1.clone()));
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
