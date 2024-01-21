@@ -376,7 +376,7 @@ fn list(
         .group_by(|x| x.2.command.clone());
     let grouped = grouped.into_iter().collect::<Vec<_>>();
 
-    let mut available_key_classes = character_iterator(grouped.len(), "".into());
+    let mut groups = vec![];
     for group in grouped.into_iter() {
         let group_list = group.1.collect::<Vec<_>>();
         if group_list.len() == 1 {
@@ -384,31 +384,38 @@ fn list(
             let suffix_text = if is_first { " <- Top pick" } else { "" };
             is_first = false;
             let (a, b, c) = group_list.pop().unwrap();
-            list_nest(
-                &mut available_key_classes,
-                "".into(),
-                &mut list,
-                NestedList::Element((a, b, c, suffix_text)),
-            )?;
+            groups.push(NestedList::Element((a, b, c, suffix_text)));
         } else {
-            list_nest(
-                &mut available_key_classes,
-                "".into(),
-                &mut list,
-                NestedList::Items(
-                    group.0,
-                    group_list
-                        .into_iter()
-                        .map(|(a, b, c)| {
-                            let suffix_text = if is_first { " <- Top pick" } else { "" };
-                            is_first = false;
-                            NestedList::Element((a, b, c, suffix_text))
-                        })
-                        .collect(),
-                ),
-            )?;
+            groups.push(NestedList::Items(
+                group.0,
+                group_list
+                    .into_iter()
+                    .map(|(a, b, c)| {
+                        let suffix_text = if is_first { " <- Top pick" } else { "" };
+                        is_first = false;
+                        NestedList::Element((a, b, c, suffix_text))
+                    })
+                    .collect(),
+            ));
         }
     }
+
+    let groups = split_by_tokens(
+        NestedList::Items(vec![], groups),
+        FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
+    );
+    match groups {
+        NestedList::Element(_) => {
+            let mut available_key_classes = character_iterator(1, "".into());
+            list_nest(&mut available_key_classes, "".into(), &mut list, groups)?;
+        }
+        NestedList::Items(_, elements) => {
+            let mut available_key_classes = character_iterator(elements.len(), "".into());
+            for element in elements.into_iter() {
+                list_nest(&mut available_key_classes, "".into(), &mut list, element)?;
+            }
+        }
+    };
     if let Some(error) = last_parsing_error.as_ref() {
         writeln!(
             body.h2(),
@@ -417,6 +424,13 @@ fn list(
         writeln!(body.pre(), "{:?}", error,)?;
     }
     to_string_response(buf.finish(), ContentType::Html)
+}
+
+fn split_by_tokens<T>(
+    list: NestedList<Vec<QueryToken>, T>,
+    max_size: usize,
+) -> NestedList<Vec<QueryToken>, T> {
+    list
 }
 
 fn route(
