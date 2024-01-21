@@ -210,10 +210,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
     available_key_classes: &mut I,
     css_prefix: String,
     list: &mut Node,
-    elements: NestedList<
-        Vec<QueryToken>,
-        (String, Option<Vec<String>>, ResolvedOutputMetadata, &str),
-    >,
+    elements: NestedState,
 ) -> anyhow::Result<()> {
     match elements {
         NestedList::Element((description, links, _meta, suffix_text)) => {
@@ -401,21 +398,13 @@ fn list(
     }
 
     let groups = split_by_tokens(
-        NestedList::Items(vec![], groups),
+        groups,
         FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
     );
-    match groups {
-        NestedList::Element(_) => {
-            let mut available_key_classes = character_iterator(1, "".into());
-            list_nest(&mut available_key_classes, "".into(), &mut list, groups)?;
-        }
-        NestedList::Items(_, elements) => {
-            let mut available_key_classes = character_iterator(elements.len(), "".into());
-            for element in elements.into_iter() {
-                list_nest(&mut available_key_classes, "".into(), &mut list, element)?;
-            }
-        }
-    };
+    let mut available_key_classes = character_iterator(groups.len(), "".into());
+    for group in groups.into_iter() {
+        list_nest(&mut available_key_classes, "".into(), &mut list, group)?;
+    }
     if let Some(error) = last_parsing_error.as_ref() {
         writeln!(
             body.h2(),
@@ -426,11 +415,81 @@ fn list(
     to_string_response(buf.finish(), ContentType::Html)
 }
 
-fn split_by_tokens<T>(
-    list: NestedList<Vec<QueryToken>, T>,
-    max_size: usize,
-) -> NestedList<Vec<QueryToken>, T> {
-    list
+type NestedState<'a> =
+    NestedList<Vec<QueryToken>, (String, Option<Vec<String>>, ResolvedOutputMetadata, &'a str)>;
+
+fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> {
+    let list = list
+        .into_iter()
+        .map(|x| match x {
+            NestedList::Element(_) => x,
+            NestedList::Items(x, items) => NestedList::Items(x, split_by_tokens(items, max_size)),
+        })
+        .collect::<Vec<_>>();
+    if list.len() > max_size {
+        let mut counts: HashMap<usize, HashSet<u64>> = HashMap::new();
+        let max_width = list
+            .iter()
+            .map(|x| match x {
+                NestedList::Element(item) => item.2.command.len(),
+                NestedList::Items(query, _) => query.len(),
+            })
+            .max()
+            .unwrap_or_default();
+        for item in list.iter() {
+            let query = match item {
+                NestedList::Element(item) => &item.2.command,
+                NestedList::Items(query, _) => query,
+            };
+            let hashes = QueryToken::content_hashes(query);
+            if let Some(last) = hashes.last() {
+                for i in hashes.len()..max_width {
+                    counts.entry(i).or_default().insert(*last);
+                }
+            }
+            for (i, hsh) in hashes.into_iter().enumerate() {
+                counts.entry(i).or_default().insert(hsh);
+            }
+        }
+        println!("counts {:#?}", counts);
+        let to_take = counts
+            .into_iter()
+            .filter_map(|(k, v)| if v.len() <= max_size { Some(k) } else { None })
+            .max();
+        if let Some(to_take) = to_take {
+            let mut out = vec![];
+            for (tokens, group) in list
+                .into_iter()
+                .group_by(|x| match x {
+                    NestedList::Element(item) => item
+                        .2
+                        .command
+                        .iter()
+                        .take(to_take + 1)
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                    NestedList::Items(item, _) => {
+                        item.iter().take(to_take + 1).cloned().collect::<Vec<_>>()
+                    }
+                })
+                .into_iter()
+            {
+                let mut items = group.collect::<Vec<_>>();
+                if items.len() == 1 {
+                    if let Some(x) = items.pop() {
+                        out.push(x)
+                    }
+                } else {
+                    out.push(NestedList::Items(tokens, items));
+                }
+            }
+            out
+        } else {
+            list
+        }
+    } else {
+        list
+    }
 }
 
 fn route(

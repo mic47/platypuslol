@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use std::{
+    collections::{hash_map::DefaultHasher, HashSet},
+    hash::{Hash, Hasher},
+};
 
 use nfa::Regex;
 
@@ -81,6 +84,31 @@ pub enum QueryToken {
     Prefix(String),
     Regex(String, Regex),
     Substitution(String, String, String),
+}
+
+impl QueryToken {
+    pub fn content_hashes(tokens: &[Self]) -> Vec<u64> {
+        let mut out = vec![];
+        let mut s = DefaultHasher::new();
+        for token in tokens {
+            match token {
+                QueryToken::Exact(item) => {
+                    item.hash(&mut s);
+                }
+                QueryToken::Prefix(item) => {
+                    item.hash(&mut s);
+                }
+                QueryToken::Regex(_, _) => {
+                    "<QUERY>".hash(&mut s);
+                }
+                QueryToken::Substitution(name, _, _) => {
+                    format!("<{}>", name).hash(&mut s);
+                }
+            }
+            out.push(s.finish());
+        }
+        out
+    }
 }
 
 impl PartialOrd for QueryToken {
