@@ -395,10 +395,10 @@ fn list(
         }
     }
 
-    let groups = split_by_tokens(
+    let groups = simplify(split_by_tokens(
         groups,
         FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
-    );
+    ));
     let mut available_key_classes = character_iterator(groups.len(), "".into());
     for group in groups.into_iter() {
         list_nest(&mut available_key_classes, "".into(), &mut list, group)?;
@@ -484,6 +484,24 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
     } else {
         list
     }
+}
+
+fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
+    let list = list
+        .into_iter()
+        .map(|x| match x {
+            NestedList::Element(_) => x,
+            NestedList::Items(x, items) => {
+                let mut items = simplify(items);
+                if items.len() == 1 {
+                    items.pop().unwrap()
+                } else {
+                    NestedList::Items(x, items)
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    list
 }
 
 fn route(
