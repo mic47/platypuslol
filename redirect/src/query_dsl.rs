@@ -78,7 +78,7 @@ fn parse_braces(input: &str) -> Option<Vec<&str>> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum QueryToken {
     Exact(String),
     Prefix(String),
@@ -91,20 +91,7 @@ impl QueryToken {
         let mut out = vec![];
         let mut s = DefaultHasher::new();
         for token in tokens {
-            match token {
-                QueryToken::Exact(item) => {
-                    item.hash(&mut s);
-                }
-                QueryToken::Prefix(item) => {
-                    item.hash(&mut s);
-                }
-                QueryToken::Regex(_, _) => {
-                    "<QUERY>".hash(&mut s);
-                }
-                QueryToken::Substitution(name, _, _) => {
-                    format!("<{}>", name).hash(&mut s);
-                }
-            }
+            token.hash(&mut s);
             out.push(s.finish());
         }
         out
