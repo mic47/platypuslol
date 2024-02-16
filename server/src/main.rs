@@ -319,12 +319,13 @@ fn list(
             .map(|x| resolve_parsed_output(x, &None))
             .next()
         {
-            failed_matches.push((
-                p.description,
-                Some(p.links),
+            failed_matches.push(NestedStateItem {
+                description: p.description,
+                links: Some(p.links),
                 meta,
-                Some(("[e] ".to_string(), "e".to_string())),
-            ));
+                key: Some(("[e] ".to_string(), "e".to_string())),
+                suffix_text: " <- default",
+            });
         }
     }
 
@@ -345,7 +346,13 @@ fn list(
         .into_iter()
         .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
     {
-        matches.push((p.description, Some(p.links), meta, None))
+        matches.push(NestedStateItem {
+            description: p.description,
+            links: Some(p.links),
+            meta,
+            key: None,
+            suffix_text: "",
+        })
     }
     let mut visited: HashSet<_> = HashSet::default();
     for (s, meta) in suggested
@@ -355,13 +362,26 @@ fn list(
         if !visited.insert(s.clone()) {
             continue;
         }
-        matches.push((s.description, s.links, meta, None))
+        matches.push(NestedStateItem {
+            description: s.description,
+            links: s.links,
+            meta,
+            key: None,
+            suffix_text: "",
+        })
     }
-    let first = matches
-        .first()
-        .cloned()
-        .map(|(a, b, c, _key)| (a, b, c, Some(("[r] ".to_string(), "r".to_string()))));
-    matches.sort_by_key(|(x0, x1, meta, _)| (meta.command.clone(), x0.clone(), x1.clone()));
+    let first = matches.first().cloned().map(|item| NestedStateItem {
+        key: Some(("[r] ".to_string(), "r".to_string())),
+        suffix_text: " <- Top pick",
+        ..item
+    });
+    matches.sort_by_key(|x| {
+        (
+            x.meta.command.clone(),
+            x.description.clone(),
+            x.links.clone(),
+        )
+    });
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
@@ -378,11 +398,10 @@ fn list(
     writeln!(div, "Typed text: ")?;
     div.span().attr("id='query'");
     let mut list = body.ul();
-    let mut is_first = true;
     let grouped = first
         .into_iter()
         .chain(failed_matches.into_iter().chain(matches))
-        .group_by(|x| x.2.command.clone());
+        .group_by(|x| x.meta.command.clone());
     let grouped = grouped.into_iter().collect::<Vec<_>>();
 
     let mut groups = vec![];
@@ -390,33 +409,11 @@ fn list(
         let group_list = group.1.collect::<Vec<_>>();
         if group_list.len() == 1 {
             let mut group_list = group_list;
-            let suffix_text = if is_first { " <- Top pick" } else { "" };
-            is_first = false;
-            let (description, links, meta, key) = group_list.pop().unwrap();
-            groups.push(NestedList::Element(NestedStateItem {
-                description,
-                links,
-                meta,
-                suffix_text,
-                key,
-            }));
+            groups.push(NestedList::Element(group_list.pop().unwrap()));
         } else {
             groups.push(NestedList::Items(
                 group.0,
-                group_list
-                    .into_iter()
-                    .map(|(description, links, meta, key)| {
-                        let suffix_text = if is_first { " <- Top pick" } else { "" };
-                        is_first = false;
-                        NestedList::Element(NestedStateItem {
-                            description,
-                            links,
-                            meta,
-                            suffix_text,
-                            key,
-                        })
-                    })
-                    .collect(),
+                group_list.into_iter().map(NestedList::Element).collect(),
             ));
         }
     }
@@ -441,6 +438,7 @@ fn list(
 
 type NestedState<'a> = NestedList<Vec<QueryToken>, NestedStateItem<'a>>;
 
+#[derive(Clone, Debug)]
 struct NestedStateItem<'a> {
     description: String,
     links: Option<Vec<String>>,
