@@ -173,6 +173,7 @@ fn add_key_class(class: Option<String>, parent: String, item: Node) -> Node {
     }
 }
 
+#[derive(Debug)]
 enum NestedList<I, T> {
     Element(T),
     Items(I, Vec<NestedList<I, T>>),
@@ -462,6 +463,7 @@ struct NestedStateItem<'a> {
 }
 
 fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> {
+    let input_len = list.len();
     let list = list
         .into_iter()
         .map(|x| match x {
@@ -500,11 +502,15 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
                 counts.entry(i).or_default().insert(hsh);
             }
         }
-        let to_take = counts
+        let (small, large): (Vec<_>, Vec<_>) = counts
             .into_iter()
-            .filter_map(|(k, v)| if v.len() <= max_size { Some(k) } else { None })
+            .map(|(k, v)| (k, v.len()))
+            .partition(|(_, v)| v <= &max_size);
+        let to_take = small
+            .into_iter()
+            .map(|(k, _)| k)
             .max()
-            .unwrap_or_default();
+            .unwrap_or_else(|| large.into_iter().map(|(k, _)| k).min().unwrap_or(max_width));
         let mut out = vec![];
         for (tokens, group) in list
             .into_iter()
@@ -513,8 +519,15 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
                     .meta
                     .command
                     .iter()
+                    .map(|token| {
+                        QueryToken::Exact(token.to_description(
+                            &item.meta.query,
+                            &item.meta.substitutions,
+                            &None,
+                            true,
+                        ))
+                    })
                     .take(to_take + 1)
-                    .cloned()
                     .collect::<Vec<_>>(),
                 NestedList::Items(item, _) => {
                     item.iter().take(to_take + 1).cloned().collect::<Vec<_>>()
@@ -527,7 +540,11 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
                 if let Some(x) = items.pop() {
                     out.push(x)
                 }
+            } else if items.len() != input_len {
+                out.push(NestedList::Items(tokens, split_by_tokens(items, max_size)));
             } else {
+                // To prevent infinite recursion, don't split if grouping didn't decrease
+                // size of the list.
                 out.push(NestedList::Items(tokens, items));
             }
         }
