@@ -218,10 +218,11 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             links,
             meta: _meta,
             suffix_text,
+            key,
         }) => {
             if let Some(links) = links {
                 if let [link] = &links[..] {
-                    let maybe_key = available_key_classes.next();
+                    let maybe_key = key.or_else(|| available_key_classes.next());
                     writeln!(
                         // TODO: escape link?
                         add_key_class(
@@ -236,7 +237,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                     )?;
                 } else {
                     let mut li = list.li();
-                    let maybe_key = available_key_classes.next();
+                    let maybe_key = key.or_else(|| available_key_classes.next());
                     let mut div = add_key_class(
                         maybe_key.clone().map(|x| x.1),
                         css_prefix.clone(),
@@ -318,7 +319,12 @@ fn list(
             .map(|x| resolve_parsed_output(x, &None))
             .next()
         {
-            failed_matches.push((p.description, Some(p.links), meta));
+            failed_matches.push((
+                p.description,
+                Some(p.links),
+                meta,
+                Some(("[e] ".to_string(), "e".to_string())),
+            ));
         }
     }
 
@@ -339,7 +345,7 @@ fn list(
         .into_iter()
         .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
     {
-        matches.push((p.description, Some(p.links), meta))
+        matches.push((p.description, Some(p.links), meta, None))
     }
     let mut visited: HashSet<_> = HashSet::default();
     for (s, meta) in suggested
@@ -349,10 +355,13 @@ fn list(
         if !visited.insert(s.clone()) {
             continue;
         }
-        matches.push((s.description, s.links, meta))
+        matches.push((s.description, s.links, meta, None))
     }
-    let first = matches.first().cloned();
-    matches.sort_by_key(|(x0, x1, meta)| (meta.command.clone(), x0.clone(), x1.clone()));
+    let first = matches
+        .first()
+        .cloned()
+        .map(|(a, b, c, _key)| (a, b, c, Some(("[r] ".to_string(), "r".to_string()))));
+    matches.sort_by_key(|(x0, x1, meta, _)| (meta.command.clone(), x0.clone(), x1.clone()));
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
@@ -383,19 +392,20 @@ fn list(
             let mut group_list = group_list;
             let suffix_text = if is_first { " <- Top pick" } else { "" };
             is_first = false;
-            let (description, links, meta) = group_list.pop().unwrap();
+            let (description, links, meta, key) = group_list.pop().unwrap();
             groups.push(NestedList::Element(NestedStateItem {
                 description,
                 links,
                 meta,
                 suffix_text,
+                key,
             }));
         } else {
             groups.push(NestedList::Items(
                 group.0,
                 group_list
                     .into_iter()
-                    .map(|(description, links, meta)| {
+                    .map(|(description, links, meta, key)| {
                         let suffix_text = if is_first { " <- Top pick" } else { "" };
                         is_first = false;
                         NestedList::Element(NestedStateItem {
@@ -403,6 +413,7 @@ fn list(
                             links,
                             meta,
                             suffix_text,
+                            key,
                         })
                     })
                     .collect(),
@@ -435,6 +446,7 @@ struct NestedStateItem<'a> {
     links: Option<Vec<String>>,
     meta: ResolvedOutputMetadata,
     suffix_text: &'a str,
+    key: Option<(String, String)>,
 }
 
 fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> {
