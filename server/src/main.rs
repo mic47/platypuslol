@@ -250,7 +250,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                     ));
                     writeln!(
                         span,
-                        "xxx {}{}{}",
+                        "{}{}{}",
                         maybe_key.clone().map(|x| x.0).unwrap_or_default(),
                         description,
                         suffix_text,
@@ -469,7 +469,6 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
             NestedList::Items(x, items) => NestedList::Items(x, split_by_tokens(items, max_size)),
         })
         .collect::<Vec<_>>();
-    println!("LIST {} {}", list.len(), max_size);
     if list.len() > max_size {
         let mut counts: HashMap<usize, HashSet<u64>> = HashMap::new();
         let max_width = list
@@ -501,14 +500,11 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
                 counts.entry(i).or_default().insert(hsh);
             }
         }
-        println!("YYY {}", max_width);
-        println!("XXX {:#?}", counts);
         let to_take = counts
             .into_iter()
             .filter_map(|(k, v)| if v.len() <= max_size { Some(k) } else { None })
             .max()
             .unwrap_or_default();
-        println!("TO TAKE {}", to_take);
         let mut out = vec![];
         for (tokens, group) in list
             .into_iter()
