@@ -13,7 +13,7 @@ function reset(event) {
 
 function setQuery(queryString) {
   var query = document.getElementById('query');
-  query.textContent = queryString;
+  query.value= queryString;
   setVisibility(queryString);
 }
 
@@ -57,18 +57,18 @@ function setVisibility(pressed) {
 
 function onKeyPress(event) {
   var query = document.getElementById('query');
-  var pressed = (query.textContent ?? "").trim();
+  var pressed = (query.value ?? "").trim();
   if (event.key.length == 1) {
     pressed += event.key;
-    query.textContent = pressed;
+    query.value = pressed;
   } else if (event.key == 'Backspace') {
     pressed = pressed.slice(0, -1);
-    query.textContent= pressed;
+    query.value = pressed;
     setVisibility(pressed);
     return;
   } else if (event.key == 'Escape') {
     pressed = "";
-    query.textContent = pressed;
+    query.value = pressed;
     setVisibility(pressed);
     return;
   }
@@ -106,6 +106,6 @@ function onLoad() {
   window.addEventListener('pagehide', reset);
   window.addEventListener('beforeunload', reset);
   var query = document.getElementById('query');
-  var pressed = (query.textContent ?? "").trim();
+  var pressed = (query.value ?? "").trim();
   setVisibility(pressed);
 }

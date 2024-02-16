@@ -384,8 +384,8 @@ fn list(
         })
     }
     let first = matches.first().cloned().map(|item| NestedStateItem {
-        key: Some(("[r] ".to_string(), "r".to_string())),
-        suffix_text: " <- Fi[r]st match",
+        key: Some(("[i] ".to_string(), "i".to_string())),
+        suffix_text: " <- F[i]rst match",
         ..item
     });
     matches.sort_by_key(|x| {
@@ -410,7 +410,7 @@ fn list(
     }
     let mut div = body.div();
     writeln!(div, "Typed text: ")?;
-    div.span().attr("id='query'");
+    div.input().attr("id='query'").attr("disabled");
     let mut list = body.ul();
     let grouped = first
         .into_iter()
