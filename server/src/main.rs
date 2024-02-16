@@ -424,6 +424,7 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
             NestedList::Items(x, items) => NestedList::Items(x, split_by_tokens(items, max_size)),
         })
         .collect::<Vec<_>>();
+    println!("LIST {} {}", list.len(), max_size);
     if list.len() > max_size {
         let mut counts: HashMap<usize, HashSet<u64>> = HashMap::new();
         let max_width = list
@@ -434,12 +435,16 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
             })
             .max()
             .unwrap_or_default();
+        let empty_query = Default::default();
+        let empty_subst = Default::default();
         for item in list.iter() {
-            let query = match item {
-                NestedList::Element(item) => &item.2.command,
-                NestedList::Items(query, _) => query,
+            let (command, query, substitutions) = match item {
+                NestedList::Element(item) => {
+                    (&item.2.command, &item.2.query, &item.2.substitutions)
+                }
+                NestedList::Items(command, _) => (command, &empty_query, &empty_subst),
             };
-            let hashes = QueryToken::content_hashes(query);
+            let hashes = QueryToken::content_hashes(command, &query, &substitutions, &None);
             if let Some(last) = hashes.last() {
                 for i in hashes.len()..max_width {
                     counts.entry(i).or_default().insert(*last);
@@ -449,11 +454,14 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
                 counts.entry(i).or_default().insert(hsh);
             }
         }
+        println!("YYY {}", max_width);
+        println!("XXX {:#?}", counts);
         let to_take = counts
             .into_iter()
             .filter_map(|(k, v)| if v.len() <= max_size { Some(k) } else { None })
             .max()
             .unwrap_or_default();
+        println!("TO TAKE {}", to_take);
         let mut out = vec![];
         for (tokens, group) in list
             .into_iter()
