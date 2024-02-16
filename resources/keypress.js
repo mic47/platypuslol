@@ -8,9 +8,13 @@ function elementByXpath(path) {
 }
 
 function reset(event) {
+  setQuery("");
+}
+
+function setQuery(queryString) {
   var query = document.getElementById('query');
-  query.textContent = "";
-  setVisibility("");
+  query.textContent = queryString;
+  setVisibility(queryString);
 }
 
 function setVisibility(pressed) {
@@ -63,6 +67,10 @@ function onKeyPress(event) {
     setVisibility(pressed);
     return;
   }
+  redirect(pressed);
+}
+
+function redirect(pressed) {
   var cls = 'onpress' + pressed;
 
   var elements = Array

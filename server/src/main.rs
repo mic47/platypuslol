@@ -38,6 +38,7 @@ lazy_static::lazy_static! {
     ]);
 }
 const LIST_JS: &str = include_str!("../../resources/keypress.js");
+const LIST_CSS: &str = include_str!("../../resources/list.css");
 
 #[derive(Clone, Debug, clap::Parser)]
 struct Cli {
@@ -243,9 +244,13 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                         css_prefix.clone(),
                         li.span(),
                     );
+                    let mut span = div.span().attr("class='aslink'").attr(&format!(
+                        "onclick='redirect(\"{}\")'",
+                        maybe_key.clone().map(|x| x.1).unwrap_or_default(),
+                    ));
                     writeln!(
-                        div,
-                        "{}{}{}",
+                        span,
+                        "xxx {}{}{}",
                         maybe_key.clone().map(|x| x.0).unwrap_or_default(),
                         description,
                         suffix_text,
@@ -273,9 +278,17 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             let maybe_key = available_key_classes.next();
             let mut available_key_classes =
                 character_iterator(items.len(), maybe_key.clone().unwrap_or_default().1);
-            let span = li.span();
+            let mut hideable_span = add_key_class(
+                maybe_key.clone().map(|x| x.1),
+                css_prefix.clone(),
+                li.span(),
+            );
+            let mut span = hideable_span.span().attr("class='aslink'").attr(&format!(
+                "onclick='setQuery(\"{}\")'",
+                maybe_key.clone().map(|x| x.1).unwrap_or_default()
+            ));
             writeln!(
-                add_key_class(maybe_key.clone().map(|x| x.1), css_prefix.clone(), span),
+                span,
                 "{}{}",
                 maybe_key.clone().map(|x| x.0).unwrap_or_default(),
                 group
@@ -323,8 +336,8 @@ fn list(
                 description: p.description,
                 links: Some(p.links),
                 meta,
-                key: Some(("[e] ".to_string(), "e".to_string())),
-                suffix_text: " <- default",
+                key: Some(("[u] ".to_string(), "u".to_string())),
+                suffix_text: " <- defa[u]lt",
             });
         }
     }
@@ -372,7 +385,7 @@ fn list(
     }
     let first = matches.first().cloned().map(|item| NestedStateItem {
         key: Some(("[r] ".to_string(), "r".to_string())),
-        suffix_text: " <- Top pick",
+        suffix_text: " <- Fi[r]st match",
         ..item
     });
     matches.sort_by_key(|x| {
@@ -388,6 +401,7 @@ fn list(
     let mut head = html.head();
     writeln!(head.title(), "List of platypus lol commands")?;
     writeln!(head.script().raw(), "{}", LIST_JS)?;
+    writeln!(head.style().raw(), "{}", LIST_CSS)?;
     let mut body = html.body().attr("onload='onLoad()'");
     if let Some(used_query) = used_query {
         writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
