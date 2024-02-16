@@ -491,7 +491,7 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
                 ),
                 NestedList::Items(command, _) => (command, &empty_query, &empty_subst),
             };
-            let hashes = QueryToken::content_hashes(command, &query, &substitutions, &None);
+            let hashes = QueryToken::content_hashes(command, query, substitutions, &None);
             if let Some(last) = hashes.last() {
                 for i in hashes.len()..max_width {
                     counts.entry(i).or_default().insert(*last);
