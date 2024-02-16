@@ -18,6 +18,11 @@ function setQuery(queryString) {
 }
 
 function setVisibility(pressed) {
+  var expand = false;
+  if (pressed.indexOf('e') > -1) {
+    pressed = pressed.replace('e', '');
+    expand = true;
+  }
   let pre = 'onpress' + pressed;
   let par = 'onparent' + pressed
   let allElements = Array.from(document.getElementsByClassName('toogable'));
@@ -42,7 +47,7 @@ function setVisibility(pressed) {
         el.parentElement.style.display = 'none';
         return
       }
-      if (!par.startsWith(onparent)) {
+      if (!par.startsWith(onparent) && !expand) {
         el.parentElement.style.display = 'none';
         return
       }
