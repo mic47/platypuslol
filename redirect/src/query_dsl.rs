@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::DefaultHasher, HashSet},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     hash::{Hash, Hasher},
 };
 
@@ -87,14 +87,49 @@ pub enum QueryToken {
 }
 
 impl QueryToken {
-    pub fn content_hashes(tokens: &[Self]) -> Vec<u64> {
+    pub fn content_hashes(
+        tokens: &[Self],
+        matches: &HashMap<String, String>,
+        substitutions: &HashMap<String, HashMap<String, String>>,
+        default_replacement: &Option<String>,
+    ) -> Vec<u64> {
         let mut out = vec![];
         let mut s = DefaultHasher::new();
         for token in tokens {
-            token.hash(&mut s);
+            token
+                .to_description(matches, substitutions, default_replacement)
+                .hash(&mut s);
             out.push(s.finish());
         }
         out
+    }
+
+    pub fn to_description(
+        &self,
+        matches: &HashMap<String, String>,
+        substitutions: &HashMap<String, HashMap<String, String>>,
+        default_replacement: &Option<String>,
+    ) -> String {
+        match self {
+            QueryToken::Exact(data) => data.clone(),
+            QueryToken::Prefix(data) => data.clone(),
+            QueryToken::Regex(replacement, _) => {
+                if let Some(replacement) = matches.get(replacement) {
+                    // TODO: we want to html escape this in better way. Probably in javascript
+                    // even?
+                    replacement.clone().replace(' ', "+")
+                } else {
+                    default_replacement.clone().unwrap_or("<query>".into())
+                }
+            }
+            QueryToken::Substitution(type_, _, subtype) => {
+                if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype)) {
+                    replacement.clone()
+                } else {
+                    format!("<{}>", type_)
+                }
+            }
+        }
     }
 }
 

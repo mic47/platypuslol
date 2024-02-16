@@ -167,7 +167,8 @@ pub fn resolve_parsed_output(
                 &substitutions,
                 &p.payload.1,
                 default_replacement,
-            ),
+            )
+            .join(" "),
         },
         ResolvedOutputMetadata {
             command: p.payload.1.clone(),
@@ -208,36 +209,16 @@ fn process_query(
         .join("")
 }
 
-fn process_suggestion(
+pub fn process_suggestion(
     matches: &HashMap<String, String>,
     substitutions: &HashMap<String, HashMap<String, String>>,
     query: &[QueryToken],
     default_replacement: &Option<String>,
-) -> String {
+) -> Vec<String> {
     query
         .iter()
-        .map(|x| match x {
-            QueryToken::Exact(data) => data.clone(),
-            QueryToken::Prefix(data) => data.clone(),
-            QueryToken::Regex(replacement, _) => {
-                if let Some(replacement) = matches.get(replacement) {
-                    // TODO: we want to html escape this in better way. Probably in javascript
-                    // even?
-                    replacement.clone().replace(' ', "+")
-                } else {
-                    default_replacement.clone().unwrap_or("<query>".into())
-                }
-            }
-            QueryToken::Substitution(type_, _, subtype) => {
-                if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype)) {
-                    replacement.clone()
-                } else {
-                    format!("<{}>", type_)
-                }
-            }
-        })
+        .map(|x| x.to_description(matches, substitutions, default_replacement))
         .collect::<Vec<_>>()
-        .join(" ")
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize)]
@@ -256,7 +237,10 @@ pub fn resolve_suggestion_output(
             description: suggestion
                 .payload
                 .as_ref()
-                .map(|x| process_suggestion(&matches, &substitutions, &x.1, default_replacement))
+                .map(|x| {
+                    process_suggestion(&matches, &substitutions, &x.1, default_replacement)
+                        .join(" ")
+                })
                 .unwrap_or(suggestion.suggestion.clone()),
             links: suggestion.payload.as_ref().map(|x| {
                 x.0.iter()
