@@ -213,7 +213,12 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
     elements: NestedState,
 ) -> anyhow::Result<()> {
     match elements {
-        NestedList::Element((description, links, _meta, suffix_text)) => {
+        NestedList::Element(NestedStateItem {
+            description,
+            links,
+            meta: _meta,
+            suffix_text,
+        }) => {
             if let Some(links) = links {
                 if let [link] = &links[..] {
                     let maybe_key = available_key_classes.next();
@@ -378,17 +383,27 @@ fn list(
             let mut group_list = group_list;
             let suffix_text = if is_first { " <- Top pick" } else { "" };
             is_first = false;
-            let (a, b, c) = group_list.pop().unwrap();
-            groups.push(NestedList::Element((a, b, c, suffix_text)));
+            let (description, links, meta) = group_list.pop().unwrap();
+            groups.push(NestedList::Element(NestedStateItem {
+                description,
+                links,
+                meta,
+                suffix_text,
+            }));
         } else {
             groups.push(NestedList::Items(
                 group.0,
                 group_list
                     .into_iter()
-                    .map(|(a, b, c)| {
+                    .map(|(description, links, meta)| {
                         let suffix_text = if is_first { " <- Top pick" } else { "" };
                         is_first = false;
-                        NestedList::Element((a, b, c, suffix_text))
+                        NestedList::Element(NestedStateItem {
+                            description,
+                            links,
+                            meta,
+                            suffix_text,
+                        })
                     })
                     .collect(),
             ));
@@ -413,8 +428,14 @@ fn list(
     to_string_response(buf.finish(), ContentType::Html)
 }
 
-type NestedState<'a> =
-    NestedList<Vec<QueryToken>, (String, Option<Vec<String>>, ResolvedOutputMetadata, &'a str)>;
+type NestedState<'a> = NestedList<Vec<QueryToken>, NestedStateItem<'a>>;
+
+struct NestedStateItem<'a> {
+    description: String,
+    links: Option<Vec<String>>,
+    meta: ResolvedOutputMetadata,
+    suffix_text: &'a str,
+}
 
 fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> {
     let list = list
@@ -430,7 +451,7 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
         let max_width = list
             .iter()
             .map(|x| match x {
-                NestedList::Element(item) => item.2.command.len(),
+                NestedList::Element(item) => item.meta.command.len(),
                 NestedList::Items(query, _) => query.len(),
             })
             .max()
@@ -439,9 +460,11 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
         let empty_subst = Default::default();
         for item in list.iter() {
             let (command, query, substitutions) = match item {
-                NestedList::Element(item) => {
-                    (&item.2.command, &item.2.query, &item.2.substitutions)
-                }
+                NestedList::Element(item) => (
+                    &item.meta.command,
+                    &item.meta.query,
+                    &item.meta.substitutions,
+                ),
                 NestedList::Items(command, _) => (command, &empty_query, &empty_subst),
             };
             let hashes = QueryToken::content_hashes(command, &query, &substitutions, &None);
@@ -467,7 +490,7 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
             .into_iter()
             .group_by(|x| match x {
                 NestedList::Element(item) => item
-                    .2
+                    .meta
                     .command
                     .iter()
                     .take(to_take + 1)
