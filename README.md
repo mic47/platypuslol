@@ -64,8 +64,9 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [ ] Remove browser extension
 - [x] shortcuts [e]xtend all
 - [x] shortcuts fi[r]st, defa[u]lt
-- [ ] just fold by tokens
+- [x] just fold by tokens
 - [x] Work with mouse 
 - [ ] back with mouse
 - [ ] Help message for list
 - [ ] Make it pretty
+- [ ] UI for commands

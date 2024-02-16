@@ -97,7 +97,7 @@ impl QueryToken {
         let mut s = DefaultHasher::new();
         for token in tokens {
             token
-                .to_description(matches, substitutions, default_replacement)
+                .to_description(matches, substitutions, default_replacement, false)
                 .hash(&mut s);
             out.push(s.finish());
         }
@@ -109,6 +109,7 @@ impl QueryToken {
         matches: &HashMap<String, String>,
         substitutions: &HashMap<String, HashMap<String, String>>,
         default_replacement: &Option<String>,
+        show_variable: bool,
     ) -> String {
         match self {
             QueryToken::Exact(data) => data.clone(),
@@ -124,7 +125,11 @@ impl QueryToken {
             }
             QueryToken::Substitution(type_, _, subtype) => {
                 if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype)) {
-                    replacement.clone()
+                    if show_variable {
+                        format!("{}={}", type_.clone(), replacement.clone())
+                    } else {
+                        replacement.clone()
+                    }
                 } else {
                     format!("<{}>", type_)
                 }

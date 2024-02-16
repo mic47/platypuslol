@@ -217,7 +217,7 @@ pub fn process_suggestion(
 ) -> Vec<String> {
     query
         .iter()
-        .map(|x| x.to_description(matches, substitutions, default_replacement))
+        .map(|x| x.to_description(matches, substitutions, default_replacement, false))
         .collect::<Vec<_>>()
 }
 
