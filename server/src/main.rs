@@ -391,8 +391,8 @@ fn list(
     });
     matches.sort_by_key(|x| {
         (
-            x.meta.command.clone(),
             x.description.clone(),
+            x.meta.command.clone(),
             x.links.clone(),
         )
     });
