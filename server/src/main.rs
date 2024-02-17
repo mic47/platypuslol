@@ -565,11 +565,12 @@ fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
     for item in list.into_iter() {
         match item {
             NestedList::Element(_) => {
-                if let Some((_, prev_x, mut prev_list)) = prev_items {
+                if let Some((_, prev_x, prev_list)) = prev_items {
+                    let mut prev_list = simplify(prev_list);
                     if prev_list.len() == 1 {
                         out.push(prev_list.pop().unwrap())
                     } else {
-                        out.push(NestedList::Items(prev_x, simplify(prev_list)))
+                        out.push(NestedList::Items(prev_x, prev_list))
                     }
                 }
                 out.push(item);
@@ -587,10 +588,11 @@ fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
                         prev_list.extend(items);
                         prev_items = Some((prev_description, prev_x, prev_list));
                     } else {
+                        let mut prev_list = simplify(prev_list);
                         if prev_list.len() == 1 {
                             out.push(prev_list.pop().unwrap())
                         } else {
-                            out.push(NestedList::Items(prev_x, simplify(prev_list)))
+                            out.push(NestedList::Items(prev_x, prev_list))
                         }
                         prev_items = Some((description, x, items));
                     }
@@ -600,7 +602,8 @@ fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
             }
         }
     }
-    if let Some((_, prev_x, mut prev_list)) = prev_items {
+    if let Some((_, prev_x, prev_list)) = prev_items {
+        let mut prev_list = simplify(prev_list);
         if prev_list.len() == 1 {
             out.push(prev_list.pop().unwrap())
         } else {
