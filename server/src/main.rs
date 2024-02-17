@@ -231,7 +231,11 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             if let Some(links) = links {
                 if links.is_empty() {
                     writeln!(
-                        list.li().span(),
+                        add_key_class(
+                            Some(format!("{}__", css_prefix)),
+                            css_prefix,
+                            list.li().span()
+                        ),
                         "[{}] ⛔ {}{}",
                         String::from_utf8(vec![b'_'; width])?,
                         description,
