@@ -232,7 +232,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                             css_prefix,
                             list.li().a().attr(&format!("href='{}'", link))
                         ),
-                        "{}{}{}",
+                        "{}🔗 {}{}",
                         maybe_key.map(|x| x.0).unwrap_or_default(),
                         description,
                         suffix_text,
@@ -251,7 +251,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                     ));
                     writeln!(
                         span,
-                        "{}{}{}",
+                        "{}🔗 {}{}",
                         maybe_key.clone().map(|x| x.0).unwrap_or_default(),
                         description,
                         suffix_text,
@@ -290,7 +290,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             ));
             writeln!(
                 span,
-                "{}{}",
+                "{}📂 {}",
                 maybe_key.clone().map(|x| x.0).unwrap_or_default(),
                 group
                     .into_iter()
@@ -399,6 +399,7 @@ fn list(
 
     let mut buf = Buffer::new();
     let mut html = buf.html().attr("lang='en'");
+    let _meta = html.meta().attr("charset=\"UTF-8\"");
     let mut head = html.head();
     writeln!(head.title(), "List of platypus lol commands")?;
     writeln!(head.script().raw(), "{}", LIST_JS)?;
