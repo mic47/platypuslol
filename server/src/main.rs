@@ -231,11 +231,8 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             if let Some(links) = links {
                 if links.is_empty() {
                     writeln!(
-                        add_key_class(
-                            Some(format!("{}__", css_prefix)),
-                            css_prefix,
-                            list.li().span()
-                        ),
+                        add_key_class(Some(format!("{}__", css_prefix)), css_prefix, list.li())
+                            .span(),
                         "[{}] ⛔ {}{}",
                         String::from_utf8(vec![b'_'; width])?,
                         description,
@@ -245,24 +242,22 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                     let maybe_key = key.or_else(|| available_key_classes.next());
                     writeln!(
                         // TODO: escape link?
-                        add_key_class(
-                            maybe_key.clone().map(|x| x.1),
-                            css_prefix,
-                            list.li().a().attr(&format!("href='{}'", link))
-                        ),
+                        add_key_class(maybe_key.clone().map(|x| x.1), css_prefix, list.li())
+                            .a()
+                            .attr(&format!("href='{}'", link)),
                         "{}🔗 {}{}",
                         maybe_key.map(|x| x.0).unwrap_or_default(),
                         description,
                         suffix_text,
                     )?;
                 } else {
-                    let mut li = list.li();
                     let maybe_key = key.or_else(|| available_key_classes.next());
-                    let mut div = add_key_class(
+                    let mut li = add_key_class(
                         maybe_key.clone().map(|x| x.1),
                         css_prefix.clone(),
-                        li.span(),
+                        list.li(),
                     );
+                    let mut div = li.span();
                     let mut span = div.span().attr("class='aslink'").attr(&format!(
                         "onclick='redirect(\"{}\")'",
                         maybe_key.clone().map(|x| x.1).unwrap_or_default(),
@@ -281,8 +276,10 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                             add_key_class(
                                 maybe_key.clone().map(|x| x.1),
                                 css_prefix.clone(),
-                                ul.li().a().attr(&format!("href='{}'", link))
-                            ),
+                                ul.li()
+                            )
+                            .a()
+                            .attr(&format!("href='{}'", link)),
                             "{}",
                             link,
                         )?;
@@ -293,15 +290,15 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             }
         }
         NestedList::Items(group, items) => {
-            let mut li = list.li();
             let maybe_key = available_key_classes.next();
             let (width, mut available_key_classes) =
                 character_iterator(items.len(), maybe_key.clone().unwrap_or_default().1);
-            let mut hideable_span = add_key_class(
+            let mut li = add_key_class(
                 maybe_key.clone().map(|x| x.1),
                 css_prefix.clone(),
-                li.span(),
+                list.li(),
             );
+            let mut hideable_span = li.span();
             let mut span = hideable_span.span().attr("class='aslink'").attr(&format!(
                 "onclick='setQuery(\"{}\")'",
                 maybe_key.clone().map(|x| x.1).unwrap_or_default()

@@ -54,14 +54,14 @@ function setVisibility(pressed) {
         return;
       }
       if (!onpress.startsWith(pre) && !pre.startsWith(onpress)) {
-        el.parentElement.style.display = 'none';
+        el.style.display = 'none';
         return
       }
       if (!par.startsWith(onparent) && !expand) {
-        el.parentElement.style.display = 'none';
+        el.style.display = 'none';
         return
       }
-      el.parentElement.style.display = '';
+      el.style.display = '';
     })
 }
 
@@ -94,6 +94,7 @@ function redirect(pressed) {
 
   var elements = Array
     .from(document.getElementsByClassName(cls))
+    .flatMap((tag) => Array.from(tag.children))
     .filter((tag) => tag.tagName.toLowerCase() == 'a');
   if (elements.length == 0) {
     setVisibility(pressed);
