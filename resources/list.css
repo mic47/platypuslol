@@ -3,3 +3,7 @@
   color:blue;
   text-decoration:underline;
 }
+
+body {
+  font-family: monospace;
+}
