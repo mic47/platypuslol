@@ -66,7 +66,7 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [x] shortcuts fi[r]st, defa[u]lt
 - [x] just fold by tokens
 - [x] Work with mouse 
-- [ ] back with mouse
+- [x] back with mouse
 - [ ] Help message for list
 - [ ] Make it pretty
 - [ ] UI for commands
