@@ -62,6 +62,7 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [ ] Foldable list of command for same type of suggestion (substitutions)
 - [ ] Go over code, remove unnecessary things / dependencies (some libraries are heavy)
 - [ ] Remove browser extension
+- [ ] Simplify after removing extension
 - [x] shortcuts [e]xtend all
 - [x] shortcuts fi[r]st, defa[u]lt
 - [x] just fold by tokens
