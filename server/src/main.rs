@@ -413,6 +413,8 @@ fn list(
     let mut div = body.div();
     writeln!(div, "Typed text: ")?;
     div.input().attr("id='query'").attr("disabled");
+    writeln!(div.button().attr("onclick='reset()'"), "reset")?;
+
     let mut list = body.ul();
     let grouped = first
         .into_iter()
