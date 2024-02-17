@@ -397,33 +397,6 @@ fn list(
         )
     });
 
-    let mut buf = Buffer::new();
-    let mut html = buf.html().attr("lang='en'");
-    let _meta = html.meta().attr("charset=\"UTF-8\"");
-    let mut head = html.head();
-    writeln!(head.title(), "List of platypus lol commands")?;
-    writeln!(head.script().raw(), "{}", LIST_JS)?;
-    writeln!(head.style().raw(), "{}", LIST_CSS)?;
-    let mut body_impl = html.body().attr("onload='onLoad()'");
-    let mut body = body_impl.div().attr("class='centered'");
-    if let Some(used_query) = used_query {
-        writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
-    } else {
-        writeln!(body.h1(), "List of All Commands")?;
-    }
-    writeln!(body, "ℹ️ Type e to expand all folders. Type text in [brackets] to visit a link🔗 or expand a folder📂. [i] is always first match and [u] is default query.")?;
-    body.br();
-    let mut div = body.div();
-    writeln!(div, "Typed text: ")?;
-    div.input().attr("id='query'").attr("disabled");
-    div.input()
-        .attr("id='expand'")
-        .attr("type='checkbox'")
-        .attr("onchange='redraw()'");
-    writeln!(div, "[e]xpand all")?;
-    writeln!(div.button().attr("onclick='reset()'"), "reset [esc]")?;
-
-    let mut list = body.ul();
     let grouped = first
         .into_iter()
         .chain(failed_matches.into_iter().chain(matches))
@@ -449,16 +422,53 @@ fn list(
         FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
     ));
     let mut available_key_classes = character_iterator(groups.len(), "".into());
-    for group in groups.into_iter() {
-        list_nest(&mut available_key_classes, "".into(), &mut list, group)?;
+
+    list_page_head(used_query, move |body| {
+        let mut list = body.ul();
+        for group in groups.into_iter() {
+            list_nest(&mut available_key_classes, "".into(), &mut list, group)?;
+        }
+        if let Some(error) = last_parsing_error.as_ref() {
+            writeln!(
+                body.h2(),
+                "Unable to load config, using old one. Last error:"
+            )?;
+            writeln!(body.pre(), "{:?}", error,)?;
+        };
+        Ok(())
+    })
+}
+
+fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
+    used_query: Option<&String>,
+    content_function: F,
+) -> anyhow::Result<Response<Body>> {
+    let mut buf = Buffer::new();
+    let mut html = buf.html().attr("lang='en'");
+    let _meta = html.meta().attr("charset=\"UTF-8\"");
+    let mut head = html.head();
+    writeln!(head.title(), "List of platypus lol commands")?;
+    writeln!(head.script().raw(), "{}", LIST_JS)?;
+    writeln!(head.style().raw(), "{}", LIST_CSS)?;
+    let mut body_impl = html.body().attr("onload='onLoad()'");
+    let mut body = body_impl.div().attr("class='centered'");
+    if let Some(used_query) = used_query {
+        writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
+    } else {
+        writeln!(body.h1(), "List of All Commands")?;
     }
-    if let Some(error) = last_parsing_error.as_ref() {
-        writeln!(
-            body.h2(),
-            "Unable to load config, using old one. Last error:"
-        )?;
-        writeln!(body.pre(), "{:?}", error,)?;
-    }
+    writeln!(body, "ℹ️ Type e to expand all folders. Type text in [brackets] to visit a link🔗 or expand a folder📂. [i] is always first match and [u] is default query.")?;
+    body.br();
+    let mut div = body.div();
+    writeln!(div, "Typed text: ")?;
+    div.input().attr("id='query'").attr("disabled");
+    div.input()
+        .attr("id='expand'")
+        .attr("type='checkbox'")
+        .attr("onchange='redraw()'");
+    writeln!(div, "[e]xpand all")?;
+    writeln!(div.button().attr("onclick='reset()'"), "reset [esc]")?;
+    content_function(&mut body)?;
     to_string_response(buf.finish(), ContentType::Html)
 }
 
