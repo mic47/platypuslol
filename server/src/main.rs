@@ -410,6 +410,8 @@ fn list(
     } else {
         writeln!(body.h1(), "List of All Commands")?;
     }
+    writeln!(body.div(), "ℹ️ Type e to expand all folders. Type text in [brackets] to visit a link🔗 or expand a folder📂. [i] is always first match and [u] is default query.")?;
+    body.br();
     let mut div = body.div();
     writeln!(div, "Typed text: ")?;
     div.input().attr("id='query'").attr("disabled");
