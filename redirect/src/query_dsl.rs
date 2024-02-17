@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     collections::{hash_map::DefaultHasher, HashMap, HashSet},
     hash::{Hash, Hasher},
 };
@@ -149,17 +150,31 @@ impl Ord for QueryToken {
             (QueryToken::Exact(left), QueryToken::Exact(right))
             | (QueryToken::Exact(left), QueryToken::Prefix(right))
             | (QueryToken::Prefix(left), QueryToken::Exact(right))
-            | (QueryToken::Prefix(left), QueryToken::Prefix(right)) => left.cmp(right),
+            | (QueryToken::Prefix(left), QueryToken::Prefix(right)) => {
+                let result = left.cmp(right);
+                match result {
+                    std::cmp::Ordering::Equal => match (self, other) {
+                        (QueryToken::Exact(_), QueryToken::Exact(_)) => result,
+                        (QueryToken::Prefix(_), QueryToken::Prefix(_)) => result,
+                        (QueryToken::Exact(_), QueryToken::Prefix(_)) => Ordering::Less,
+                        (QueryToken::Prefix(_), QueryToken::Exact(_)) => Ordering::Greater,
+                        _ => unreachable!(),
+                    },
+                    _ => result,
+                }
+            }
             (QueryToken::Regex(lefta, leftb), QueryToken::Regex(righta, rightb)) => {
                 (lefta, leftb).cmp(&(righta, rightb))
             }
             (QueryToken::Substitution(la, lb, lc), QueryToken::Substitution(ra, rb, rc)) => {
                 (la, lb, lc).cmp(&(ra, rb, rc))
             }
-            (QueryToken::Exact(_), _) => std::cmp::Ordering::Less,
-            (QueryToken::Prefix(_), _) => std::cmp::Ordering::Less,
-            (QueryToken::Regex(_, _), _) => std::cmp::Ordering::Less,
-            (QueryToken::Substitution(_, _, _), _) => std::cmp::Ordering::Less,
+            (QueryToken::Exact(_), _) => Ordering::Less,
+            (_, QueryToken::Exact(_)) => Ordering::Greater,
+            (QueryToken::Prefix(_), _) => Ordering::Less,
+            (_, QueryToken::Prefix(_)) => Ordering::Greater,
+            (QueryToken::Regex(_, _), _) => Ordering::Less,
+            (_, QueryToken::Regex(_, _)) => Ordering::Greater,
         }
     }
 }
