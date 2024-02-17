@@ -456,7 +456,7 @@ fn list(
     ));
     let (width, mut available_key_classes) = character_iterator(groups.len(), "".into());
 
-    list_page_head(used_query, move |body| {
+    list_page_head(used_query, last_parsing_error, move |body| {
         let mut list = body.ul();
         for group in groups.into_iter() {
             list_nest(
@@ -468,19 +468,13 @@ fn list(
                 /* nesting */ 0,
             )?;
         }
-        if let Some(error) = last_parsing_error.as_ref() {
-            writeln!(
-                body.h2(),
-                "Unable to load config, using old one. Last error:"
-            )?;
-            writeln!(body.pre(), "{:?}", error,)?;
-        };
         Ok(())
     })
 }
 
 fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     used_query: Option<&String>,
+    last_parsing_error: LastParsingError,
     content_function: F,
 ) -> anyhow::Result<Response<Body>> {
     let mut buf = Buffer::new();
@@ -509,6 +503,13 @@ fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     writeln!(div, "[e]xpand all")?;
     writeln!(div.button().attr("onclick='reset()'"), "reset [esc]")?;
     content_function(&mut body)?;
+    if let Some(error) = last_parsing_error.as_ref() {
+        writeln!(
+            body.h2(),
+            "Unable to load config, using old one. Last error:"
+        )?;
+        writeln!(body.pre(), "{:?}", error,)?;
+    };
     to_string_response(buf.finish(), ContentType::Html)
 }
 
