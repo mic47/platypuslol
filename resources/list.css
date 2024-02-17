@@ -11,3 +11,8 @@ a {
 body {
   font-family: monospace;
 }
+
+.centered {
+  margin: auto;
+  max-width: 55em;
+}

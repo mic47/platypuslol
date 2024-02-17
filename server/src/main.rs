@@ -404,13 +404,14 @@ fn list(
     writeln!(head.title(), "List of platypus lol commands")?;
     writeln!(head.script().raw(), "{}", LIST_JS)?;
     writeln!(head.style().raw(), "{}", LIST_CSS)?;
-    let mut body = html.body().attr("onload='onLoad()'");
+    let mut body_impl = html.body().attr("onload='onLoad()'");
+    let mut body = body_impl.div().attr("class='centered'");
     if let Some(used_query) = used_query {
         writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
     } else {
         writeln!(body.h1(), "List of All Commands")?;
     }
-    writeln!(body.div(), "ℹ️ Type e to expand all folders. Type text in [brackets] to visit a link🔗 or expand a folder📂. [i] is always first match and [u] is default query.")?;
+    writeln!(body, "ℹ️ Type e to expand all folders. Type text in [brackets] to visit a link🔗 or expand a folder📂. [i] is always first match and [u] is default query.")?;
     body.br();
     let mut div = body.div();
     writeln!(div, "Typed text: ")?;
@@ -420,7 +421,7 @@ fn list(
         .attr("type='checkbox'")
         .attr("onchange='redraw()'");
     writeln!(div, "[e]xpand all")?;
-    writeln!(div.button().attr("onclick='reset()'"), "reset")?;
+    writeln!(div.button().attr("onclick='reset()'"), "reset [esc]")?;
 
     let mut list = body.ul();
     let grouped = first
