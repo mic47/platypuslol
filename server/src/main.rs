@@ -565,7 +565,6 @@ fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
     for item in list.into_iter() {
         match item {
             NestedList::Element(_) => {
-                out.push(item);
                 if let Some((_, prev_x, mut prev_list)) = prev_items {
                     if prev_list.len() == 1 {
                         out.push(prev_list.pop().unwrap())
@@ -573,6 +572,7 @@ fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
                         out.push(NestedList::Items(prev_x, simplify(prev_list)))
                     }
                 }
+                out.push(item);
                 prev_items = None;
             }
             NestedList::Items(x, items) => {
