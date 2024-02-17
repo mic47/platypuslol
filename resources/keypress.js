@@ -17,12 +17,22 @@ function setQuery(queryString) {
   setVisibility(queryString);
 }
 
-function setVisibility(pressed) {
+function expandState() {
   var expand = false;
-  if (pressed.indexOf('e') > -1) {
-    pressed = pressed.replace('e', '');
-    expand = true;
+  if (document.getElementById('expand').checked) {
+    expand = true
   }
+  return expand;
+}
+
+function flipExpandState() {
+  let item = document.getElementById('expand');
+  item.checked = !item.checked;
+  redraw();
+}
+
+function setVisibility(pressed) {
+  let expand = expandState();
   let pre = 'onpress' + pressed;
   let par = 'onparent' + pressed
   let allElements = Array.from(document.getElementsByClassName('toogable'));
@@ -56,6 +66,10 @@ function setVisibility(pressed) {
 }
 
 function onKeyPress(event) {
+  if (event.key == 'e') {
+    flipExpandState();
+    return;
+  }
   var query = document.getElementById('query');
   var pressed = (query.value ?? "").trim();
   if (event.key.length == 1) {
@@ -97,6 +111,12 @@ function redirect(pressed) {
   }
 }
 
+function redraw() {
+  var query = document.getElementById('query');
+  var pressed = (query.value ?? "").trim();
+  setVisibility(pressed);
+}
+
 function onLoad() {
   var input = document
     .querySelector('body')
@@ -105,7 +125,5 @@ function onLoad() {
   window.addEventListener('pagehide', reset);
   window.addEventListener('pagehide', reset);
   window.addEventListener('beforeunload', reset);
-  var query = document.getElementById('query');
-  var pressed = (query.value ?? "").trim();
-  setVisibility(pressed);
+  redraw();
 }
