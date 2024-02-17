@@ -1,7 +1,11 @@
 .aslink {
-  cursor:pointer;
-  color:blue;
-  text-decoration:underline;
+  cursor: pointer;
+  color: blue;
+  text-decoration: none;
+}
+
+a {
+  text-decoration: none;
 }
 
 body {
