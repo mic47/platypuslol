@@ -162,12 +162,14 @@ fn local(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Respo
     Err(anyhow::anyhow!("Missing parameter file"))
 }
 
-fn add_key_class(class: Option<String>, parent: String, item: Node) -> Node {
+fn add_key_class(class: Option<String>, parent: String, item: Node, nesting: usize) -> Node {
     if let Some(class) = class {
-        item.attr(&format!(
-            "class='toogable onpress{} onparent{}'",
-            class, parent
-        ))
+        let attr = format!("class='toogable onpress{} onparent{}'", class, parent);
+        if nesting > 0 {
+            item.attr(&attr).attr("style='display:none;'")
+        } else {
+            item.attr(&attr)
+        }
     } else {
         item
     }
@@ -219,6 +221,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
     css_prefix: String,
     list: &mut Node,
     elements: NestedState,
+    nesting: usize,
 ) -> anyhow::Result<()> {
     match elements {
         NestedList::Element(NestedStateItem {
@@ -231,8 +234,13 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             if let Some(links) = links {
                 if links.is_empty() {
                     writeln!(
-                        add_key_class(Some(format!("{}__", css_prefix)), css_prefix, list.li())
-                            .span(),
+                        add_key_class(
+                            Some(format!("{}__", css_prefix)),
+                            css_prefix,
+                            list.li(),
+                            nesting
+                        )
+                        .span(),
                         "[{}] ⛔ {}{}",
                         String::from_utf8(vec![b'_'; width])?,
                         description,
@@ -242,9 +250,14 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                     let maybe_key = key.or_else(|| available_key_classes.next());
                     writeln!(
                         // TODO: escape link?
-                        add_key_class(maybe_key.clone().map(|x| x.1), css_prefix, list.li())
-                            .a()
-                            .attr(&format!("href='{}'", link)),
+                        add_key_class(
+                            maybe_key.clone().map(|x| x.1),
+                            css_prefix,
+                            list.li(),
+                            nesting
+                        )
+                        .a()
+                        .attr(&format!("href='{}'", link)),
                         "{}🔗 {}{}",
                         maybe_key.map(|x| x.0).unwrap_or_default(),
                         description,
@@ -256,6 +269,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                         maybe_key.clone().map(|x| x.1),
                         css_prefix.clone(),
                         list.li(),
+                        nesting,
                     );
                     let mut div = li.span();
                     let mut span = div.span().attr("class='aslink'").attr(&format!(
@@ -276,7 +290,8 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                             add_key_class(
                                 maybe_key.clone().map(|x| x.1),
                                 css_prefix.clone(),
-                                ul.li()
+                                ul.li(),
+                                nesting,
                             )
                             .a()
                             .attr(&format!("href='{}'", link)),
@@ -297,6 +312,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                 maybe_key.clone().map(|x| x.1),
                 css_prefix.clone(),
                 list.li(),
+                nesting,
             );
             let mut hideable_span = li.span();
             let mut span = hideable_span.span().attr("class='aslink'").attr(&format!(
@@ -325,6 +341,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                     maybe_key.clone().map(|x| x.1).unwrap_or_default(),
                     &mut ul,
                     item,
+                    nesting + 1,
                 )?;
             }
         }
@@ -448,6 +465,7 @@ fn list(
                 "".into(),
                 &mut list,
                 group,
+                /* nesting */ 0,
             )?;
         }
         if let Some(error) = last_parsing_error.as_ref() {
