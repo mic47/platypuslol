@@ -184,12 +184,14 @@ const FAST_SHORTCUT_CHARACTERS: &str = "fjdksla"; //"hgrueiwoqptyvncmxbz12345678
 fn character_iterator(
     total: usize,
     css_prefix: String,
-) -> Box<dyn Iterator<Item = (String, String)>> {
+) -> (usize, Box<dyn Iterator<Item = (String, String)>>) {
     let mut out = FAST_SHORTCUT_CHARACTERS
         .chars()
         .map(|c| c.to_string())
         .collect::<Vec<_>>();
+    let mut width = 1;
     while out.len() < total {
+        width += 1;
         out = out
             .into_iter()
             .flat_map(|s| {
@@ -201,15 +203,19 @@ fn character_iterator(
             .collect();
     }
 
-    Box::new(
-        out.into_iter()
-            .map(move |c| (format!("[{}] ", c), format!("{}{}", css_prefix, c))),
+    (
+        width,
+        Box::new(
+            out.into_iter()
+                .map(move |c| (format!("[{}] ", c), format!("{}{}", css_prefix, c))),
+        ),
     )
 }
 
 #[allow(clippy::type_complexity)]
 fn list_nest<I: Iterator<Item = (String, String)>>(
     available_key_classes: &mut I,
+    width: usize,
     css_prefix: String,
     list: &mut Node,
     elements: NestedState,
@@ -223,7 +229,15 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             key,
         }) => {
             if let Some(links) = links {
-                if let [link] = &links[..] {
+                if links.is_empty() {
+                    writeln!(
+                        list.li().span(),
+                        "[{}] ⛔ {}{}",
+                        String::from_utf8(vec![b'_'; width])?,
+                        description,
+                        suffix_text,
+                    )?;
+                } else if let [link] = &links[..] {
                     let maybe_key = key.or_else(|| available_key_classes.next());
                     writeln!(
                         // TODO: escape link?
@@ -277,7 +291,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
         NestedList::Items(group, items) => {
             let mut li = list.li();
             let maybe_key = available_key_classes.next();
-            let mut available_key_classes =
+            let (width, mut available_key_classes) =
                 character_iterator(items.len(), maybe_key.clone().unwrap_or_default().1);
             let mut hideable_span = add_key_class(
                 maybe_key.clone().map(|x| x.1),
@@ -306,6 +320,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
             for item in items.into_iter() {
                 list_nest(
                     &mut available_key_classes,
+                    width,
                     maybe_key.clone().map(|x| x.1).unwrap_or_default(),
                     &mut ul,
                     item,
@@ -421,12 +436,18 @@ fn list(
         groups,
         FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
     ));
-    let mut available_key_classes = character_iterator(groups.len(), "".into());
+    let (width, mut available_key_classes) = character_iterator(groups.len(), "".into());
 
     list_page_head(used_query, move |body| {
         let mut list = body.ul();
         for group in groups.into_iter() {
-            list_nest(&mut available_key_classes, "".into(), &mut list, group)?;
+            list_nest(
+                &mut available_key_classes,
+                width,
+                "".into(),
+                &mut list,
+                group,
+            )?;
         }
         if let Some(error) = last_parsing_error.as_ref() {
             writeln!(

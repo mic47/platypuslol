@@ -158,7 +158,7 @@ pub fn resolve_parsed_output(
                 .payload
                 .0
                 .iter()
-                .map(|payload| {
+                .filter_map(|payload| {
                     process_query(&matches, &substitutions, payload, default_replacement)
                 })
                 .collect(),
@@ -183,30 +183,36 @@ fn process_query(
     substitutions: &HashMap<String, HashMap<String, String>>,
     query: &[LinkToken],
     default_replacement: &Option<String>,
-) -> String {
-    query
-        .iter()
-        .map(|x| match x {
-            LinkToken::Exact(data) => data.clone(),
-            LinkToken::Replacement(replacement) => {
-                if let Some(replacement) = matches.get(replacement) {
-                    // TODO: we want to html escape this in better way. Probably in javascript
-                    // even?
-                    replacement.clone().replace(' ', "+")
-                } else {
-                    default_replacement.clone().unwrap_or("<query>".into())
-                }
-            }
-            LinkToken::Substitution(type_, subtype) => {
-                if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype)) {
-                    replacement.clone()
-                } else {
-                    format!("<{}>", type_)
-                }
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("")
+) -> Option<String> {
+    Some(
+        query
+            .iter()
+            .map(|x| {
+                Some(match x {
+                    LinkToken::Exact(data) => data.clone(),
+                    LinkToken::Replacement(replacement) => {
+                        if let Some(replacement) = matches.get(replacement) {
+                            // TODO: we want to html escape this in better way. Probably in javascript
+                            // even?
+                            replacement.clone().replace(' ', "+")
+                        } else {
+                            default_replacement.clone()?
+                        }
+                    }
+                    LinkToken::Substitution(type_, subtype) => {
+                        if let Some(replacement) =
+                            substitutions.get(type_).and_then(|x| x.get(subtype))
+                        {
+                            replacement.clone()
+                        } else {
+                            format!("<{}>", type_)
+                        }
+                    }
+                })
+            })
+            .collect::<Option<Vec<_>>>()?
+            .join(""),
+    )
 }
 
 pub fn process_suggestion(
@@ -244,7 +250,9 @@ pub fn resolve_suggestion_output(
                 .unwrap_or(suggestion.suggestion.clone()),
             links: suggestion.payload.as_ref().map(|x| {
                 x.0.iter()
-                    .map(|link| process_query(&matches, &substitutions, link, default_replacement))
+                    .filter_map(|link| {
+                        process_query(&matches, &substitutions, link, default_replacement)
+                    })
                     .collect()
             }),
         },
