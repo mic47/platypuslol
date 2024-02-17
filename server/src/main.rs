@@ -558,6 +558,7 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
 fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
     let mut out = vec![];
     let mut prev_items: Option<(
+        Vec<String>,
         Vec<QueryToken>,
         Vec<NestedList<Vec<QueryToken>, NestedStateItem>>,
     )> = None;
@@ -568,25 +569,31 @@ fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
                 prev_items = None;
             }
             NestedList::Items(x, items) => {
-                if let Some((prev_x, mut prev_list)) = prev_items {
-                    if prev_x == x {
+                let description = x
+                    .iter()
+                    .map(|t| {
+                        t.to_description(&HashMap::default(), &HashMap::default(), &None, true)
+                    })
+                    .collect::<Vec<_>>();
+                if let Some((prev_description, prev_x, mut prev_list)) = prev_items {
+                    if prev_description == description {
                         prev_list.extend(items);
-                        prev_items = Some((prev_x, prev_list));
+                        prev_items = Some((prev_description, prev_x, prev_list));
                     } else {
                         if prev_list.len() == 1 {
                             out.push(prev_list.pop().unwrap())
                         } else {
                             out.push(NestedList::Items(prev_x, simplify(prev_list)))
                         }
-                        prev_items = Some((x, items));
+                        prev_items = Some((description, x, items));
                     }
                 } else {
-                    prev_items = Some((x, items));
+                    prev_items = Some((description, x, items));
                 }
             }
         }
     }
-    if let Some((prev_x, mut prev_list)) = prev_items {
+    if let Some((_, prev_x, mut prev_list)) = prev_items {
         if prev_list.len() == 1 {
             out.push(prev_list.pop().unwrap())
         } else {
