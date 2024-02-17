@@ -413,6 +413,11 @@ fn list(
     let mut div = body.div();
     writeln!(div, "Typed text: ")?;
     div.input().attr("id='query'").attr("disabled");
+    div.input()
+        .attr("id='expand'")
+        .attr("type='checkbox'")
+        .attr("onchange='redraw()'");
+    writeln!(div, "[e]xpand all")?;
     writeln!(div.button().attr("onclick='reset()'"), "reset")?;
 
     let mut list = body.ul();
