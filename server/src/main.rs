@@ -554,22 +554,46 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
-    let list = list
-        .into_iter()
-        .map(|x| match x {
-            NestedList::Element(_) => x,
+    let mut out = vec![];
+    let mut prev_items: Option<(
+        Vec<QueryToken>,
+        Vec<NestedList<Vec<QueryToken>, NestedStateItem>>,
+    )> = None;
+    for item in list.into_iter() {
+        match item {
+            NestedList::Element(_) => {
+                out.push(item);
+                prev_items = None;
+            }
             NestedList::Items(x, items) => {
-                let mut items = simplify(items);
-                if items.len() == 1 {
-                    items.pop().unwrap()
+                if let Some((prev_x, mut prev_list)) = prev_items {
+                    if prev_x == x {
+                        prev_list.extend(items);
+                        prev_items = Some((prev_x, prev_list));
+                    } else {
+                        if prev_list.len() == 1 {
+                            out.push(prev_list.pop().unwrap())
+                        } else {
+                            out.push(NestedList::Items(prev_x, simplify(prev_list)))
+                        }
+                        prev_items = Some((x, items));
+                    }
                 } else {
-                    NestedList::Items(x, items)
+                    prev_items = Some((x, items));
                 }
             }
-        })
-        .collect::<Vec<_>>();
-    list
+        }
+    }
+    if let Some((prev_x, mut prev_list)) = prev_items {
+        if prev_list.len() == 1 {
+            out.push(prev_list.pop().unwrap())
+        } else {
+            out.push(NestedList::Items(prev_x, simplify(prev_list)))
+        }
+    }
+    out
 }
 
 fn route(
