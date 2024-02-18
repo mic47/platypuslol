@@ -196,6 +196,7 @@ fn process_query(
                             // even?
                             replacement.clone().replace(' ', "+")
                         } else {
+                            // If we cannot produce the link, let's not return the link
                             default_replacement.clone()?
                         }
                     }
@@ -205,7 +206,8 @@ fn process_query(
                         {
                             replacement.clone()
                         } else {
-                            format!("<{}>", type_)
+                            // If we cannot produce the link, let's not return the link
+                            None?
                         }
                     }
                 })
