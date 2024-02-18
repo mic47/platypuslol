@@ -1243,9 +1243,7 @@ async fn load_fetch_and_parse_configs(
 async fn load_config(config_path: &Path) -> anyhow::Result<Arc<CommonAppState>> {
     load_fetch_and_parse_configs(config_path)
         .await
-        .and_then(|x| {
-            CommonAppState::new(x).map_err(|err| anyhow::anyhow!("Unable to create state: {err}"))
-        })
+        .and_then(|x| CommonAppState::new(x).context("Unable to create state"))
         .map(Arc::new)
 }
 

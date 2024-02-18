@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use anyhow::Context;
 use serde::Serialize;
 
-use crate::{parse_link, parse_query, validate_query_with_link, LinkToken, QueryToken};
+use crate::{
+    parse_link, parse_query, validate_query_and_link_with_substitutions, validate_query_with_link,
+    LinkToken, QueryToken,
+};
 use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 
 #[derive(Clone, Debug)]
@@ -42,7 +45,21 @@ pub fn create_parser(
                     .map(|link| {
                         let parsed_link: Vec<LinkToken> = parse_link(link)
                             .with_context(|| format!("Unable to parse link '{}'", link))?;
-                        validate_query_with_link(&sentence, &c.query, &parsed_link, link)?;
+                        validate_query_with_link(&sentence, &c.query, &parsed_link, link)
+                            .with_context(|| {
+                                format!("Unable to validate '{}' with '{}'", c.query, link)
+                            })?;
+                        validate_query_and_link_with_substitutions(
+                            &sentence,
+                            &parsed_link,
+                            &substitutions,
+                        )
+                        .with_context(|| {
+                            format!(
+                                "Unable to validate substitutions in '{}' with '{}'",
+                                c.query, link
+                            )
+                        })?;
                         anyhow::Result::<_>::Ok(parsed_link)
                     })
                     .collect::<Result<Vec<_>, _>>()?;

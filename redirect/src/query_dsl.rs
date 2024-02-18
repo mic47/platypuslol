@@ -255,6 +255,78 @@ pub fn parse_link(input: &str) -> anyhow::Result<Vec<LinkToken>> {
         .collect()
 }
 
+pub fn validate_query_and_link_with_substitutions(
+    query: &[QueryToken],
+    link: &[LinkToken],
+    substitutions: &HashMap<String, Vec<HashMap<String, String>>>,
+) -> anyhow::Result<()> {
+    let type_to_subtype = substitutions
+        .iter()
+        .map(|(k, v)| (k, v.iter().flat_map(|x| x.keys()).collect::<HashSet<_>>()))
+        .collect::<HashMap<_, _>>();
+    let mut name_to_type: HashMap<&String, &String> = HashMap::new();
+    for token in query {
+        match token {
+            QueryToken::Exact(_) => {}
+            QueryToken::Prefix(_) => {}
+            QueryToken::Regex(_, _) => {}
+            QueryToken::Substitution(name, type_, subtype) => {
+                name_to_type.insert(name, type_);
+                if let Some(subtypes) = type_to_subtype.get(type_) {
+                    if !subtypes.contains(subtype) {
+                        Err(anyhow::anyhow!(
+                            "Substitution '{}' does not have '{}' in query token '{:?}'. Valid values are {:?}",
+                            type_,
+                            subtype,
+                            token,
+                            subtypes,
+                        ))?
+                    }
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Invalid substitution '{}' in query token '{:?}'. Valid substitutions are {:?}",
+                        type_,
+                        token,
+                        type_to_subtype.keys(),
+                    ))?
+                }
+            }
+        }
+    }
+    for token in link {
+        match token {
+            LinkToken::Exact(_) => {}
+            LinkToken::Replacement(_) => {}
+            LinkToken::Substitution(name, subtype) => {
+                let type_ = name_to_type.get(name).ok_or_else(|| anyhow::anyhow!(
+                    "There is no substitution named '{}' in the query. Existing substitutions are {:?}",
+                    name,
+                    name_to_type.keys(),
+                ))?;
+                if let Some(subtypes) = type_to_subtype.get(*type_) {
+                    if !subtypes.contains(subtype) {
+                        Err(anyhow::anyhow!(
+                            "Substitution '{}' does not have '{}' in link token '{:?}'. Valid values are {:?}",
+                            type_,
+                            subtype,
+                            token,
+                            subtypes,
+                        ))?
+                    }
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Invalid substitution '{}' in link token '{:?}'. Valid substitutions are {:?}",
+                        type_,
+                        token,
+                        type_to_subtype.keys(),
+                    ))?
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn validate_query_with_link(
     query: &[QueryToken],
     query_str: &str,

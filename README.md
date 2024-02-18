@@ -54,7 +54,7 @@ You can edit then `~/.config/platypus-lol/commands.conf` to your liking.
 - [ ] Remove unwraps, handle errors properly everywhere
 - [ ] Better validation errors and documentation
 - [ ] Add more tests to all parser parts to document expectations / behavior of modules
-- [ ] Add better parser error handling -- more useful errors
+- [x] Add better parser error handling -- more useful errors
 - [ ] Foldable list of command for same type of suggestion (substitutions)
 - [ ] Go over code, remove unnecessary things / dependencies (some libraries are heavy)
 - [x] Remove browser extension
