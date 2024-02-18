@@ -349,12 +349,14 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
     Ok(())
 }
 
-fn list(
-    req: Request<Body>,
+fn list_get_groups<'a>(
+    param_q: Option<&String>,
     state: Arc<CommonAppState>,
-    last_parsing_error: LastParsingError,
     failed_query: Option<&str>,
-) -> anyhow::Result<Response<Body>> {
+) -> (
+    Option<String>,
+    Vec<NestedList<Vec<QueryToken>, NestedStateItem<'a>>>,
+) {
     let mut failed_matches = vec![];
     if let Some(failed_query) = failed_query {
         let (parsed, _) = state
@@ -376,9 +378,7 @@ fn list(
         }
     }
 
-    let p = query_params(&req);
-    let (used_query, (parsed, suggested)) = p
-        .get("q")
+    let (used_query, (parsed, suggested)) = param_q
         .and_then(|q| {
             let (p, s) = state.parser.parse_full_and_suggest(q);
             if p.is_empty() && s.is_empty() {
@@ -450,10 +450,23 @@ fn list(
         }
     }
 
-    let groups = simplify(split_by_tokens(
-        groups,
-        FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
-    ));
+    (
+        used_query.cloned(),
+        simplify(split_by_tokens(
+            groups,
+            FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
+        )),
+    )
+}
+
+fn list(
+    req: Request<Body>,
+    state: Arc<CommonAppState>,
+    last_parsing_error: LastParsingError,
+    failed_query: Option<&str>,
+) -> anyhow::Result<Response<Body>> {
+    let p = query_params(&req);
+    let (used_query, groups) = list_get_groups(p.get("q"), state, failed_query);
     let (width, mut available_key_classes) = character_iterator(groups.len(), "".into());
 
     list_page_head(used_query, last_parsing_error, move |body| {
@@ -473,7 +486,7 @@ fn list(
 }
 
 fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
-    used_query: Option<&String>,
+    used_query: Option<String>,
     last_parsing_error: LastParsingError,
     content_function: F,
 ) -> anyhow::Result<Response<Body>> {
