@@ -70,4 +70,5 @@ To make extension, run `make wasm`, and then load it unpacked into chrome. Curre
 - [x] back with mouse
 - [x] Help message for list
 - [x] Make it pretty
-- [ ] UI for commands
+- [x] UI for commands
+- [x] Help message for commands
