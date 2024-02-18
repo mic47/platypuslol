@@ -17,6 +17,7 @@ pub struct CommonAppState {
     pub behavior: Behavior,
     pub parser: NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     pub local_configs: HashMap<String, String>,
+    pub loaded_config: Config<String, RedirectConfig<String>>,
 }
 
 impl CommonAppState {
@@ -25,12 +26,12 @@ impl CommonAppState {
         local_configs: HashMap<String, String>,
     ) -> Result<Self, String> {
         let Config {
-            fallback,
-            behavior,
-            redirects,
-            external_configurations,
+            ref fallback,
+            ref behavior,
+            ref redirects,
+            ref external_configurations,
         } = loaded_config;
-        let mut substitutions = redirects.substitutions;
+        let mut substitutions = redirects.substitutions.clone();
         for (t, ext_conf) in external_configurations.iter() {
             if let Some(ref conf) = ext_conf.config {
                 for subst_key in ext_conf.substitutions_to_inherit.iter() {
@@ -47,17 +48,17 @@ impl CommonAppState {
                 }
             }
         }
-        let mut parsers = vec![create_parser(redirects.redirects, substitutions)
+        let mut parsers = vec![create_parser(redirects.redirects.clone(), substitutions)
             .map_err(|err| format!("Unable to create parser from main config: {}", err))?];
-        for (url, config) in external_configurations.into_iter() {
+        for (url, config) in external_configurations.iter() {
             if !config.enabled {
                 continue;
             }
-            if let Some(redirects) = config.config {
+            if let Some(ref redirects) = config.config {
                 let maybe_parser = create_parser_with_optional_prefix(
-                    redirects.redirects,
-                    redirects.substitutions,
-                    config.prefix,
+                    redirects.redirects.clone(),
+                    redirects.substitutions.clone(),
+                    config.prefix.clone(),
                 )
                 .map_err(|err| format!("Unable to create parser from config {:?}: {}", url, err));
                 match url {
@@ -73,7 +74,7 @@ impl CommonAppState {
         }
         Ok(CommonAppState {
             parser: NFA::any_of(&parsers),
-            behavior,
+            behavior: behavior.clone(),
             local_configs,
             fallback: Fallback {
                 behavior: fallback.clone(),
@@ -81,7 +82,7 @@ impl CommonAppState {
                     vec![ConfigLinkQuery {
                         query: fallback.make_query("{query:query}"),
                         exact: false,
-                        links: vec![fallback.link],
+                        links: vec![fallback.link.clone()],
                     }],
                     Default::default(),
                 )
@@ -92,6 +93,7 @@ impl CommonAppState {
                     )
                 })?,
             },
+            loaded_config,
         })
     }
 
