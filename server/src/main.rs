@@ -32,10 +32,10 @@ lazy_static::lazy_static! {
     ]);
 
     static ref BUILTIN_PARSERS: HashMap<String, &'static str> = HashMap::from([
-        ("commands/base.json".into(), include_str!("../../extension/commands/base.json")),
-        ("commands/google.json".into(), include_str!("../../extension/commands/google.json")),
-        ("commands/python.json".into(), include_str!("../../extension/commands/python.json")),
-        ("commands/github.json".into(), include_str!("../../extension/commands/github.json")),
+        ("commands/base.json".into(), include_str!("../../config/commands/base.json")),
+        ("commands/google.json".into(), include_str!("../../config/commands/google.json")),
+        ("commands/python.json".into(), include_str!("../../config/commands/python.json")),
+        ("commands/github.json".into(), include_str!("../../config/commands/github.json")),
     ]);
 }
 const LIST_JS: &str = include_str!("../../resources/keypress.js");

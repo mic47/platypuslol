@@ -2,13 +2,13 @@ ci: FORCE
 	cargo fmt && cargo test && cargo clippy --all-targets -- -D clippy::all -D warnings
 
 run: FORCE
-	cargo run --bin tool -- --link-config extension/commands.json --query "create google rawg"
+	cargo run --bin tool -- --link-config config/commands.json --query "create google rawg"
 
 run-suggest: FORCE
-	cargo run --bin tool -- --link-config extension/commands.json --query "cr"
+	cargo run --bin tool -- --link-config config/commands.json --query "cr"
 
 run-server: FORCE
-	 cargo run --bin platypus-lol -- --link-config extension/commands.json
+	 cargo run --bin platypus-lol -- --link-config config/commands.json
 
 release: FORCE
 	cargo build --release --bin platypus-lol
@@ -25,7 +25,7 @@ install: FORCE release
 	if [ -f ${LOCAL_BINARY} ] ; then mv ${LOCAL_BINARY} $$(mktemp) ; fi
 	cp target/release/platypus-lol ${LOCAL_BINARY}
 	mkdir -p ${LOCAL_CONFIG}
-	if [ ! -f "${LOCAL_COMMANDS}" ] ; then cp extension/commands.json ${LOCAL_COMMANDS} ; fi
+	if [ ! -f "${LOCAL_COMMANDS}" ] ; then cp config/commands.json ${LOCAL_COMMANDS} ; fi
 	cat scripts/platypus-lol.service | envsubst > ${LOCAL_SYSTEMD}/platypus-lol.service
 	systemctl --user daemon-reload
 	systemctl --user enable platypus-lol
