@@ -16,15 +16,11 @@ pub struct CommonAppState {
     pub fallback: Fallback,
     pub behavior: Behavior,
     pub parser: NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
-    pub local_configs: HashMap<String, String>,
     pub loaded_config: Config<String, RedirectConfig<String>>,
 }
 
 impl CommonAppState {
-    pub fn new(
-        loaded_config: Config<String, RedirectConfig<String>>,
-        local_configs: HashMap<String, String>,
-    ) -> Result<Self, String> {
+    pub fn new(loaded_config: Config<String, RedirectConfig<String>>) -> Result<Self, String> {
         let Config {
             ref fallback,
             ref behavior,
@@ -75,7 +71,6 @@ impl CommonAppState {
         Ok(CommonAppState {
             parser: NFA::any_of(&parsers),
             behavior: behavior.clone(),
-            local_configs,
             fallback: Fallback {
                 behavior: fallback.clone(),
                 parser: create_parser(

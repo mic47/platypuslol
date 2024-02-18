@@ -59,7 +59,7 @@ pub fn init_parser(js_config: &str) -> Result<ExtensionParser, String> {
             )
             .map_err(|x| x.to_string())?,
         )?;
-    let app_state = CommonAppState::new(config, Default::default())?;
+    let app_state = CommonAppState::new(config)?;
     Ok(ExtensionParser { state: app_state })
 }
 
