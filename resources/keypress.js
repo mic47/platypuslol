@@ -110,9 +110,10 @@ function redraw() {
 }
 
 function onLoad() {
-  var input = document
-    .querySelector('body')
-    .addEventListener('keydown', onKeyPress);
+  Array.from(document.getElementsByClassName("list_commands"))
+    .forEach((element) => {
+      element.addEventListener('keydown', onKeyPress);
+    });
   window.addEventListener('pageshow', reset);
   window.addEventListener('pagehide', reset);
   window.addEventListener('pagehide', reset);

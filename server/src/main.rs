@@ -486,7 +486,7 @@ fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     writeln!(head.title(), "List of platypus lol commands")?;
     writeln!(head.script().raw(), "{}", LIST_JS)?;
     writeln!(head.style().raw(), "{}", LIST_CSS)?;
-    let mut body_impl = html.body().attr("onload='onLoad()'");
+    let mut body_impl = html.body().attr("onload='onLoad()'").attr("class='list_commands'");
     let mut body = body_impl.div().attr("class='centered'");
     if let Some(used_query) = used_query {
         writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
