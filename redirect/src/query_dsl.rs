@@ -182,7 +182,7 @@ impl Ord for QueryToken {
 impl QueryToken {
     fn new(tokens: &[&str]) -> Result<Self, String> {
         Ok(match tokens {
-            [] => Err("empty brace parameters")?,
+            [] | [""] => Err("empty brace parameters")?,
             [item, "exact"] => Self::Exact((*item).into()),
             [item, "word"] => Self::Regex((*item).into(), Regex::new(r"\w+")?),
             [item] | [item, "query"] => Self::Regex((*item).into(), Regex::new(r".+")?),
@@ -209,7 +209,7 @@ pub enum LinkToken {
 impl LinkToken {
     fn new(tokens: &[&str]) -> Result<Self, String> {
         Ok(match tokens {
-            [] => Err("empty brace parameters")?,
+            [] | [""] => Err("empty brace parameters")?,
             [item] => Self::Replacement((*item).into()),
             [type_, subtype] => Self::Substitution((*type_).into(), (*subtype).into()),
             x => Err(format!("unable to parse brace expression {:?}", x))?,
