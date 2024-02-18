@@ -76,8 +76,8 @@ pub fn create_parser(
                             QueryToken::Regex(_, _) => {
                                 parsers.push(NFA::match_one_or_more_spaces());
                             }
-                            QueryToken::Substitution(_, _, _) => match prev {
-                                QueryToken::Regex(_, _) | QueryToken::Substitution(_, _, _) => {
+                            QueryToken::Substitution { .. } => match prev {
+                                QueryToken::Regex(_, _) | QueryToken::Substitution { .. } => {
                                     parsers.push(NFA::match_one_or_more_spaces())
                                 }
                                 QueryToken::Exact(_) | QueryToken::Prefix(_) => {
@@ -85,7 +85,7 @@ pub fn create_parser(
                                 }
                             },
                             QueryToken::Exact(_) | QueryToken::Prefix(_) => match prev {
-                                QueryToken::Regex(_, _) | QueryToken::Substitution(_, _, _) => {
+                                QueryToken::Regex(_, _) | QueryToken::Substitution { .. } => {
                                     parsers.push(NFA::match_one_or_more_spaces());
                                 }
                                 QueryToken::Exact(_) | QueryToken::Prefix(_) => {
@@ -100,21 +100,23 @@ pub fn create_parser(
                         QueryToken::Regex(ref identifier, ref regex) => {
                             NFA::regex(identifier.clone(), regex.clone())
                         }
-                        QueryToken::Substitution(ref identifier, ref type_, ref subtype) => {
-                            NFA::substitution(
-                                identifier.clone(),
-                                substitutions
-                                    .get(type_)
-                                    .map(|x| {
-                                        x.iter()
-                                            .filter_map(|x| {
-                                                x.get(subtype).map(|y| (y.clone(), x.clone()))
-                                            })
-                                            .collect()
-                                    })
-                                    .unwrap_or_default(),
-                            )
-                        }
+                        QueryToken::Substitution {
+                            ref name,
+                            ref type_,
+                            ref subtype,
+                        } => NFA::substitution(
+                            name.clone(),
+                            substitutions
+                                .get(type_)
+                                .map(|x| {
+                                    x.iter()
+                                        .filter_map(|x| {
+                                            x.get(subtype).map(|y| (y.clone(), x.clone()))
+                                        })
+                                        .collect()
+                                })
+                                .unwrap_or_default(),
+                        ),
                     });
                     prev = Some(word.clone())
                 }
@@ -220,9 +222,9 @@ fn process_query(
                             default_replacement.clone()?
                         }
                     }
-                    LinkToken::Substitution(type_, subtype) => {
+                    LinkToken::Substitution { name, subtype } => {
                         if let Some(replacement) =
-                            substitutions.get(type_).and_then(|x| x.get(subtype))
+                            substitutions.get(name).and_then(|x| x.get(subtype))
                         {
                             replacement.clone()
                         } else {

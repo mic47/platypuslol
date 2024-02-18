@@ -88,7 +88,11 @@ pub enum QueryToken {
     Exact(String),
     Prefix(String),
     Regex(String, Regex),
-    Substitution(String, String, String),
+    Substitution {
+        name: String,
+        type_: String,
+        subtype: String,
+    },
 }
 
 impl QueryToken {
@@ -128,7 +132,11 @@ impl QueryToken {
                     default_replacement.clone().unwrap_or("<query>".into())
                 }
             }
-            QueryToken::Substitution(type_, _, subtype) => {
+            QueryToken::Substitution {
+                type_,
+                name: _,
+                subtype,
+            } => {
                 if let Some(replacement) = substitutions.get(type_).and_then(|x| x.get(subtype)) {
                     if show_variable {
                         format!("{}={}", type_.clone(), replacement.clone())
@@ -170,9 +178,18 @@ impl Ord for QueryToken {
             (QueryToken::Regex(lefta, leftb), QueryToken::Regex(righta, rightb)) => {
                 (lefta, leftb).cmp(&(righta, rightb))
             }
-            (QueryToken::Substitution(la, lb, lc), QueryToken::Substitution(ra, rb, rc)) => {
-                (la, lb, lc).cmp(&(ra, rb, rc))
-            }
+            (
+                QueryToken::Substitution {
+                    name: la,
+                    type_: lb,
+                    subtype: lc,
+                },
+                QueryToken::Substitution {
+                    name: ra,
+                    type_: rb,
+                    subtype: rc,
+                },
+            ) => (la, lb, lc).cmp(&(ra, rb, rc)),
             (QueryToken::Exact(_), _) => Ordering::Less,
             (_, QueryToken::Exact(_)) => Ordering::Greater,
             (QueryToken::Prefix(_), _) => Ordering::Less,
@@ -190,15 +207,15 @@ impl QueryToken {
             [item, "exact"] => Self::Exact((*item).into()),
             [item, "word"] => Self::Regex((*item).into(), Regex::new(r"\w+")?),
             [item] | [item, "query"] => Self::Regex((*item).into(), Regex::new(r".+")?),
-            [item, "subst", type_, subtype] => Self::Substitution(
-                if item.is_empty() {
+            [item, "subst", type_, subtype] => Self::Substitution {
+                name: if item.is_empty() {
                     (*type_).into()
                 } else {
                     (*item).into()
                 },
-                (*type_).into(),
-                (*subtype).into(),
-            ),
+                type_: (*type_).into(),
+                subtype: (*subtype).into(),
+            },
             x => Err(anyhow::anyhow!("unable to parse brace expression {:?}", x))?,
         })
     }
@@ -208,14 +225,17 @@ impl QueryToken {
 pub enum LinkToken {
     Exact(String),
     Replacement(String),
-    Substitution(String, String),
+    Substitution { name: String, subtype: String },
 }
 impl LinkToken {
     fn new(tokens: &[&str]) -> anyhow::Result<Self> {
         Ok(match tokens {
             [] | [""] => Err(anyhow::anyhow!("empty brace parameters"))?,
             [item] => Self::Replacement((*item).into()),
-            [type_, subtype] => Self::Substitution((*type_).into(), (*subtype).into()),
+            [name, subtype] => Self::Substitution {
+                name: (*name).into(),
+                subtype: (*subtype).into(),
+            },
             x => Err(anyhow::anyhow!("unable to parse brace expression {:?}", x))?,
         })
     }
@@ -270,7 +290,11 @@ pub fn validate_query_and_link_with_substitutions(
             QueryToken::Exact(_) => {}
             QueryToken::Prefix(_) => {}
             QueryToken::Regex(_, _) => {}
-            QueryToken::Substitution(name, type_, subtype) => {
+            QueryToken::Substitution {
+                name,
+                type_,
+                subtype,
+            } => {
                 name_to_type.insert(name, type_);
                 if let Some(subtypes) = type_to_subtype.get(type_) {
                     if !subtypes.contains(subtype) {
@@ -297,7 +321,7 @@ pub fn validate_query_and_link_with_substitutions(
         match token {
             LinkToken::Exact(_) => {}
             LinkToken::Replacement(_) => {}
-            LinkToken::Substitution(name, subtype) => {
+            LinkToken::Substitution { name, subtype } => {
                 let type_ = name_to_type.get(name).ok_or_else(|| anyhow::anyhow!(
                     "There is no substitution named '{}' in the query. Existing substitutions are {:?}",
                     name,
@@ -356,22 +380,26 @@ pub fn validate_query_with_link(
             difference, query_str, link_str,
         ));
     }
-    let link_substitution_types = link
+    let link_substitution_names = link
         .iter()
         .filter_map(|x| match x {
-            LinkToken::Substitution(type_, _) => Some(type_),
+            LinkToken::Substitution { name, subtype: _ } => Some(name),
             _ => None,
         })
         .collect::<HashSet<_>>();
-    let query_substitution_types = query
+    let query_substitution_names = query
         .iter()
         .filter_map(|x| match x {
-            QueryToken::Substitution(type_, _, _) => Some(type_),
+            QueryToken::Substitution {
+                name,
+                type_: _,
+                subtype: _,
+            } => Some(name),
             _ => None,
         })
         .collect::<HashSet<_>>();
-    let difference = link_substitution_types
-        .difference(&query_substitution_types)
+    let difference = link_substitution_names
+        .difference(&query_substitution_names)
         .collect::<Vec<_>>();
     if !difference.is_empty() {
         return Err(anyhow::anyhow!(

@@ -319,7 +319,11 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                         redirect::QueryToken::Exact(x) => x,
                         redirect::QueryToken::Prefix(x) => x,
                         redirect::QueryToken::Regex(x, _) => x,
-                        redirect::QueryToken::Substitution(x, _, _) => format!("<{x}>"),
+                        redirect::QueryToken::Substitution {
+                            name,
+                            type_: _,
+                            subtype: _,
+                        } => format!("<{name}>"),
                     })
                     .join(" ")
             )?;
