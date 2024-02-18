@@ -1,12 +1,3 @@
-function elementByXpath(path) {
-  let data = document.evaluate('//body/ul/li/a', document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-  var output = [];
-  for (var i = 0; i < data.snapshotLength; i++) {
-    output.push(data.snapshotItem(i));
-  }
-  return output
-}
-
 function reset(event) {
   setQuery("");
 }
