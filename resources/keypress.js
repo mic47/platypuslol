@@ -4,13 +4,16 @@ function reset(event) {
 
 function setQuery(queryString) {
   var query = document.getElementById('query');
+  if (query == null) {
+    return;
+  }
   query.value= queryString;
   setVisibility(queryString);
 }
 
 function expandState() {
   var expand = false;
-  if (document.getElementById('expand').checked) {
+  if (document.getElementById('expand')?.checked) {
     expand = true
   }
   return expand;
@@ -18,6 +21,9 @@ function expandState() {
 
 function flipExpandState() {
   let item = document.getElementById('expand');
+  if (item == null) {
+    return
+  }
   item.checked = !item.checked;
   redraw();
 }
@@ -62,6 +68,9 @@ function onKeyPress(event) {
     return;
   }
   var query = document.getElementById('query');
+  if (query == null) {
+    return
+  }
   var pressed = (query.value ?? "").trim();
   if (event.key.length == 1) {
     pressed += event.key;
@@ -105,7 +114,7 @@ function redirect(pressed) {
 
 function redraw() {
   var query = document.getElementById('query');
-  var pressed = (query.value ?? "").trim();
+  var pressed = (query?.value ?? "").trim();
   setVisibility(pressed);
 }
 
