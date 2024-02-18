@@ -754,6 +754,28 @@ fn config_form(section: &mut Node, params: &HashMap<String, String>) -> anyhow::
         form.button().attr("type='submit'").attr("name='test'"),
         "Test"
     )?;
+    form.br();
+    writeln!(form, "You can test above existing or new query commands. If new command is valid, this tool will show you snippet that you can put into documentation.")?;
+    let mut list = form.ul();
+    writeln!(list.li(), "Test query -- what you put")?;
+    writeln!(
+        list.li(),
+        "Query -- query part of the command. What you type into browser."
+    )?;
+    writeln!(list.li(), "Links -- one link per line.")?;
+    writeln!(form, "Inside query and links, you can use following substitution variables, all inside braces '{{}}':")?;
+    let mut list = form.ul();
+    writeln!(
+        list.li(),
+        "{{word:exact}} -- \"word\" will be matched exactly"
+    )?;
+    writeln!(
+        list.li(),
+        "{{name:word}} -- match single word. You can use matched word in the link using '{{name}}'"
+    )?;
+    writeln!(list.li(), "{{name:query}} -- match any string, including white spaces. You can use matched string in the link using '{{name}}'")?;
+    writeln!(list.li(), "{{name:subst:type:K1}} -- match key 'K1' string from substitution of 'type'. In case 'name' is empty, 'type' is used as 'name'. You can use '{{name:K2}}' in the link to substitute to key 'K2' from matched substitution. Substitution is matched if it's a substring. For example 'ol' matches 'rofl', but 'lo' does not.")?;
+
     Ok(())
 }
 
