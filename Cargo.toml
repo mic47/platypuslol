@@ -5,7 +5,6 @@ members = [
   "nfa",
   "redirect",
   "tool",
-  "wasm_lol",
   "server",
 ]
 
@@ -17,7 +16,6 @@ version = "0.0.0"
 nfa = { path="nfa" }
 redirect = { path = "redirect" }
 tool = { path = "tool" }
-wasm_lol = { path = "wasm_lol" }
 server = { path = "server" }
 
 anyhow = "1.0.71"
@@ -32,4 +30,3 @@ serde = { version = "1.0.164" , features = ["derive"] }
 serde_path_to_error = "0.1.11"
 tokio = { version = "1.28.2", features = ["full"]}
 url = "2.4.0"
-wasm-bindgen = "0.2.86"
