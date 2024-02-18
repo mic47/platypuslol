@@ -192,12 +192,19 @@ pub struct RedirectConfigFile {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfigLinkQueryFile {
     pub query: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default = "default_empty")]
     pub links: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default = "default_none")]
     pub link: Option<String>,
+    #[serde(skip_serializing_if = "not")]
     #[serde(default)]
     pub exact: bool,
+}
+
+fn not(x: &bool) -> bool {
+    !x
 }
 
 fn default_empty<T>() -> Vec<T> {
