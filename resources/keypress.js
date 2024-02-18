@@ -129,3 +129,16 @@ function onLoad() {
   window.addEventListener('beforeunload', reset);
   redraw();
 }
+
+function flipVisibility(id) {
+  console.log("flipping", id);
+  var element = document.getElementById(id);
+  if (element == null || element == undefined) {
+    return;
+  }
+  if (element.style.display == 'none') {
+    element.style.display = '';
+  } else {
+    element.style.display = 'none';
+  }
+}

@@ -850,10 +850,12 @@ fn config(
     }
 
     let mut section = body.div().attr("class='config_section'");
+    let mut config_ids = 0;
     config_entry(
         "Main config",
         &state.loaded_config.redirects,
         &mut section,
+        &mut config_ids,
         &[],
     )?;
 
@@ -867,6 +869,7 @@ fn config(
                 &format!("{:?}", cname),
                 inner_config,
                 &mut section,
+                &mut config_ids,
                 &config.substitutions_to_inherit,
             )?;
         }
@@ -878,6 +881,7 @@ fn config_entry(
     section_name: &str,
     config: &RedirectConfig<String>,
     section: &mut Node,
+    config_ids: &mut usize,
     substitutions_to_inherit: &[String],
 ) -> anyhow::Result<()> {
     let substitutions_to_inherit = substitutions_to_inherit.iter().collect::<HashSet<_>>();
@@ -903,9 +907,19 @@ fn config_entry(
             writeln!(row.td(), "{{{}:{}}}", sname, key)?;
         }
 
-        section.br();
-        writeln!(section.h4(), "'{}' Values", sname)?;
-        let mut table = section.table();
+        let id = format!("cfgval_{}", config_ids);
+        *config_ids += 1;
+        writeln!(
+            section
+                .h4()
+                .attr(&format!("onclick='flipVisibility(\"{}\")'", id)),
+            "Click to see '{}' values",
+            sname
+        )?;
+        let mut table = section
+            .table()
+            .attr(&format!("id='{}'", id))
+            .attr("style='display:none'");
         let mut header = table.tr();
         for key in keys.iter() {
             writeln!(header.th(), "{}", key)?;
@@ -918,7 +932,6 @@ fn config_entry(
             }
         }
     }
-    section.br();
     writeln!(section.h3(), "Redirects")?;
     let mut redirects = section.table();
     let mut header = redirects.tr();
