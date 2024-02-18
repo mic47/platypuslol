@@ -487,6 +487,18 @@ fn list_interface(body: &mut Node) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn error_in_config(body: &mut Node, last_parsing_error: LastParsingError) -> anyhow::Result<()> {
+    if let Some(error) = last_parsing_error.as_ref() {
+        let mut section = body.div().attr("class='error'");
+        writeln!(
+            section.h2(),
+            "Unable to load config, using old one. Last error:"
+        )?;
+        writeln!(section.pre(), "{:?}", error)?;
+    };
+    Ok(())
+}
+
 fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     used_query: Option<String>,
     last_parsing_error: LastParsingError,
@@ -504,6 +516,7 @@ fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
         .attr("onload='onLoad()'")
         .attr("class='list_commands'");
     let mut body = body_impl.div().attr("class='centered'");
+    error_in_config(&mut body, last_parsing_error)?;
     if let Some(used_query) = used_query {
         writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
     } else {
@@ -513,13 +526,6 @@ fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     body.br();
     list_interface(&mut body)?;
     content_function(&mut body)?;
-    if let Some(error) = last_parsing_error.as_ref() {
-        writeln!(
-            body.h2(),
-            "Unable to load config, using old one. Last error:"
-        )?;
-        writeln!(body.pre(), "{:?}", error,)?;
-    };
     to_string_response(buf.finish(), ContentType::Html)
 }
 
