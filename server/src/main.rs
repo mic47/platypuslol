@@ -15,8 +15,9 @@ use itertools::Itertools;
 use notify::{Event, INotifyWatcher, RecursiveMode, Watcher};
 
 use redirect::{
-    resolve_parsed_output, resolve_suggestion_output, CommonAppState, Config, ConfigUrl,
-    ExternalParser, QueryToken, RedirectConfig, ResolvedOutputMetadata,
+    resolve_parsed_output, resolve_suggestion_output, CommonAppState, Config, ConfigLinkQuery,
+    ConfigLinkQueryFile, ConfigUrl, ExternalParser, QueryToken, RedirectConfig,
+    ResolvedOutputMetadata,
 };
 use tokio::runtime::Runtime;
 
@@ -339,7 +340,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
 }
 
 fn list_get_groups<'a>(
-    param_q: Option<&String>,
+    param_q: Option<&str>,
     state: Arc<CommonAppState>,
     failed_query: Option<&str>,
 ) -> (
@@ -440,7 +441,7 @@ fn list_get_groups<'a>(
     }
 
     (
-        used_query.cloned(),
+        used_query.map(String::from),
         simplify(split_by_tokens(
             groups,
             FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
@@ -455,7 +456,7 @@ fn list(
     failed_query: Option<&str>,
 ) -> anyhow::Result<Response<Body>> {
     let p = query_params(&req);
-    let (used_query, groups) = list_get_groups(p.get("q"), state, failed_query);
+    let (used_query, groups) = list_get_groups(p.get("q").map(|x| x.as_str()), state, failed_query);
     let (width, mut available_key_classes) = character_iterator(groups.len(), "".into());
 
     list_page_head(used_query, last_parsing_error, move |body| {
@@ -691,6 +692,248 @@ fn simplify(list: Vec<NestedState>) -> Vec<NestedState> {
     out
 }
 
+#[allow(clippy::type_complexity)]
+fn config_parse_params_and_get_updated_config(
+    params: &HashMap<String, String>,
+    state: &CommonAppState,
+) -> (
+    String,
+    Option<(String, Vec<String>)>,
+    Config<String, RedirectConfig<String>>,
+) {
+    let test_query = params.get("test_query").cloned().unwrap_or_default();
+    if let (Some(query), Some(links)) = (
+        params.get("query").cloned(),
+        params.get("links").map(|x| {
+            x.split('\n')
+                .map(|x| x.trim().to_string())
+                .filter(|x| !x.is_empty())
+                .collect::<Vec<_>>()
+        }),
+    ) {
+        let mut config = state.loaded_config.clone();
+        config.redirects.redirects.push(ConfigLinkQuery {
+            query: query.clone(),
+            links: links.clone(),
+            exact: false,
+        });
+        (
+            test_query,
+            if !query.is_empty() && !links.is_empty() {
+                Some((query, links))
+            } else {
+                None
+            },
+            config,
+        )
+    } else {
+        (test_query, None, state.loaded_config.clone())
+    }
+}
+
+fn config_form(section: &mut Node, params: &HashMap<String, String>) -> anyhow::Result<()> {
+    // TODO: add html escape
+    let mut form = section.form();
+    writeln!(form, "Test query: ")?;
+    let test_query = form.input().attr("name='test_query'");
+    params
+        .get("test_query")
+        .map(|q| test_query.attr(&format!("value='{}'", q)));
+    form.br();
+    writeln!(form, "Query: ")?;
+    let query = form.input().attr("name='query'");
+    params
+        .get("query")
+        .map(|q| query.attr(&format!("value='{}'", q)));
+    form.br();
+    writeln!(form, "Links: ")?;
+    let mut links = form.textarea().attr("name='links'").attr("rows=1");
+    params.get("links").map(|q| writeln!(links, "{}", q));
+    form.br();
+    writeln!(
+        form.button().attr("type='submit'").attr("name='test'"),
+        "Test"
+    )?;
+    Ok(())
+}
+
+fn config_success_test(
+    section: &mut Node,
+    state: CommonAppState,
+    test_query: &str,
+    query_with_links: Option<(String, Vec<String>)>,
+) -> anyhow::Result<()> {
+    writeln!(section, "Config successfully tested. Following would be matched if you used '{}'. Click inside green area to test it interactively", test_query)?;
+    section.br();
+    let mut playground = section
+        .div()
+        .attr("tabindex='-1'")
+        .attr("class='playground list_commands'");
+    list_interface(&mut playground)?;
+    let (_, groups) = list_get_groups(Some(test_query), Arc::new(state), Some(test_query));
+    let mut list = playground.ul();
+    let (width, mut available_key_classes) = character_iterator(groups.len(), "".into());
+    for group in groups.into_iter() {
+        list_nest(
+            &mut available_key_classes,
+            width,
+            "".into(),
+            &mut list,
+            group,
+            /* nesting */ 0,
+        )?;
+    }
+
+    if let Some((query, links)) = query_with_links {
+        writeln!(
+            section,
+            "If you are satisfied, write following entry into the config:"
+        )?;
+        writeln!(
+            section.pre(),
+            "{}",
+            serde_json::to_string_pretty(&ConfigLinkQueryFile {
+                query,
+                links,
+                link: None,
+                exact: false
+            })
+            .unwrap_or_else(|err| format!("Unable to serialize config entry: {:#?}", err))
+        )?;
+    } else {
+        writeln!(
+            section,
+            "Query or links is missing. Not showing what to add to config."
+        )?;
+    }
+    Ok(())
+}
+
+fn config(
+    req: Request<Body>,
+    state: Arc<CommonAppState>,
+    last_parsing_error: LastParsingError,
+) -> anyhow::Result<Response<Body>> {
+    let mut buf = Buffer::new();
+    let mut html = buf.html().attr("lang='en'");
+    let _meta = html.meta().attr("charset=\"UTF-8\"");
+    let mut head = html.head();
+    writeln!(head.script().raw(), "{}", LIST_JS)?;
+    writeln!(head.style().raw(), "{}", LIST_CSS)?;
+    let mut body_impl = html.body().attr("onload='onLoad()'");
+    let mut body = body_impl.div().attr("class='centered_wide'");
+    error_in_config(&mut body, last_parsing_error)?;
+
+    let params = query_params(&req);
+
+    {
+        // Config tester section
+        let mut section = body.div().attr("class='config_section'");
+        writeln!(section.h2(), "Config query tester")?;
+        if params.contains_key("test") {
+            section.br();
+            let (test_query, query_with_links, config) =
+                config_parse_params_and_get_updated_config(&params, state.as_ref());
+            match CommonAppState::new(config) {
+                Ok(state) => {
+                    config_success_test(&mut section, state, &test_query, query_with_links)?;
+                }
+                Err(err) => {
+                    let mut section = section.div().attr("class='error'");
+                    writeln!(section, "There was an error parsing config:")?;
+                    section.br();
+                    writeln!(section.pre(), "{:#}", err)?;
+                }
+            }
+        }
+        config_form(&mut section, &params)?;
+    }
+
+    let mut section = body.div().attr("class='config_section'");
+    config_entry(
+        "Main config",
+        &state.loaded_config.redirects,
+        &mut section,
+        &[],
+    )?;
+
+    for (cname, config) in state.loaded_config.external_configurations.iter() {
+        if !config.enabled {
+            continue;
+        }
+        if let Some(ref inner_config) = config.config {
+            let mut section = body.div().attr("class='config_section'");
+            config_entry(
+                &format!("{:?}", cname),
+                inner_config,
+                &mut section,
+                &config.substitutions_to_inherit,
+            )?;
+        }
+    }
+    to_string_response(buf.finish(), ContentType::Html)
+}
+
+fn config_entry(
+    section_name: &str,
+    config: &RedirectConfig<String>,
+    section: &mut Node,
+    substitutions_to_inherit: &[String],
+) -> anyhow::Result<()> {
+    let substitutions_to_inherit = substitutions_to_inherit.iter().collect::<HashSet<_>>();
+    writeln!(section.h2(), "{}", section_name)?;
+    for (sname, subst) in config.substitutions.iter() {
+        writeln!(section.h3(), "Substitution: '{}'", sname)?;
+        if substitutions_to_inherit.contains(sname) {
+            writeln!(section, "ℹ️ This substutution is usable in the main config.")?;
+        }
+        let mut keys = HashSet::new();
+        subst.iter().for_each(|x| keys.extend(x.keys()));
+        let mut keys = keys.into_iter().collect::<Vec<_>>();
+        keys.sort();
+        let mut table = section.table();
+        let mut header = table.tr();
+        writeln!(header.th(), "field")?;
+        writeln!(header.th(), "Use in query")?;
+        writeln!(header.th(), "Use in link")?;
+        for key in keys.iter() {
+            let mut row = table.tr();
+            writeln!(row.th(), "{}", key)?;
+            writeln!(row.td(), "{{:subst:{}:{}}}", sname, key)?;
+            writeln!(row.td(), "{{{}:{}}}", sname, key)?;
+        }
+
+        section.br();
+        writeln!(section.h4(), "'{}' Values", sname)?;
+        let mut table = section.table();
+        let mut header = table.tr();
+        for key in keys.iter() {
+            writeln!(header.th(), "{}", key)?;
+        }
+        let empty = String::default();
+        for s in subst.iter() {
+            let mut row = table.tr();
+            for key in keys.iter() {
+                writeln!(row.td(), "{}", s.get(*key).unwrap_or(&empty))?;
+            }
+        }
+    }
+    section.br();
+    writeln!(section.h3(), "Redirects")?;
+    let mut redirects = section.table();
+    let mut header = redirects.tr();
+    writeln!(header.th(), "query")?;
+    writeln!(header.th(), "exact")?;
+    writeln!(header.th(), "links")?;
+    for command in config.redirects.iter() {
+        let mut row = redirects.tr();
+        writeln!(row.td(), "{}", command.query)?;
+        writeln!(row.td(), "{}", command.exact)?;
+        writeln!(row.td(), "{}", command.links.iter().join(", "))?;
+    }
+    Ok(())
+}
+
 fn route(
     req: Request<Body>,
     state: Arc<RwLock<Arc<CommonAppState>>>,
@@ -714,6 +957,7 @@ fn route(
             ContentType::OpenSearchDescription,
         ),
         (&Method::GET, "/list") => list(req, state, last_parsing_error, None),
+        (&Method::GET, "/config") => config(req, state, last_parsing_error),
         (&Method::GET, "/debug") => debug(req, state),
         (&Method::GET, "/redirect") => redirect(req, state, last_parsing_error),
         (&Method::GET, "/suggest") => suggest(req, state),

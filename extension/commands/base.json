@@ -6,6 +6,10 @@
       "link": "list"
     },
     {
+      "query": "config",
+      "link": "config"
+    },
+    {
       "query": "install",
       "link": "install"
     }

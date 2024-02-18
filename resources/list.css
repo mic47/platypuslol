@@ -16,3 +16,31 @@ body {
   margin: auto;
   max-width: 55em;
 }
+
+.centered_wide {
+  margin: auto;
+  max-width: 120em;
+}
+
+.config_section {
+  background-color: lightgray;
+}
+
+.error {
+  background-color: pink;
+  margin: 1em;
+}
+
+.playground {
+  background-color: lightgreen;
+  margin: auto;
+  max-width: 55em;
+}
+
+table {
+  font-size: 1em;
+}
+
+table, th, td {
+  border: 1px solid;
+}
