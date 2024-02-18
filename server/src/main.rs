@@ -474,6 +474,19 @@ fn list(
     })
 }
 
+fn list_interface(body: &mut Node) -> anyhow::Result<()> {
+    let mut div = body.div();
+    writeln!(div, "Typed text: ")?;
+    div.input().attr("id='query'").attr("disabled");
+    div.input()
+        .attr("id='expand'")
+        .attr("type='checkbox'")
+        .attr("onchange='redraw()'");
+    writeln!(div, "[e]xpand all")?;
+    writeln!(div.button().attr("onclick='reset()'"), "reset [esc]")?;
+    Ok(())
+}
+
 fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     used_query: Option<String>,
     last_parsing_error: LastParsingError,
@@ -486,7 +499,10 @@ fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     writeln!(head.title(), "List of platypus lol commands")?;
     writeln!(head.script().raw(), "{}", LIST_JS)?;
     writeln!(head.style().raw(), "{}", LIST_CSS)?;
-    let mut body_impl = html.body().attr("onload='onLoad()'").attr("class='list_commands'");
+    let mut body_impl = html
+        .body()
+        .attr("onload='onLoad()'")
+        .attr("class='list_commands'");
     let mut body = body_impl.div().attr("class='centered'");
     if let Some(used_query) = used_query {
         writeln!(body.h1(), "List of Commands for Query '{}'", used_query)?;
@@ -495,15 +511,7 @@ fn list_page_head<F: FnOnce(&mut Node) -> anyhow::Result<()>>(
     }
     writeln!(body, "ℹ️ Type e to expand all folders. Type text in [brackets] to visit a link🔗 or expand a folder📂. [i] is always first match and [u] is default query.")?;
     body.br();
-    let mut div = body.div();
-    writeln!(div, "Typed text: ")?;
-    div.input().attr("id='query'").attr("disabled");
-    div.input()
-        .attr("id='expand'")
-        .attr("type='checkbox'")
-        .attr("onchange='redraw()'");
-    writeln!(div, "[e]xpand all")?;
-    writeln!(div.button().attr("onclick='reset()'"), "reset [esc]")?;
+    list_interface(&mut body)?;
     content_function(&mut body)?;
     if let Some(error) = last_parsing_error.as_ref() {
         writeln!(
