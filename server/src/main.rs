@@ -864,7 +864,7 @@ fn config(
                     let mut section = section.div().attr("class='error'");
                     writeln!(section, "There was an error parsing config:")?;
                     section.br();
-                    writeln!(section.pre(), "{:#}", err)?;
+                    writeln!(section.pre(), "{:?}", err)?;
                 }
             }
         }

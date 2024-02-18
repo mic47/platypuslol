@@ -10,3 +10,4 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 nfa.workspace = true
 serde.workspace = true
+anyhow.workspace = true

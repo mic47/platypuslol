@@ -4,6 +4,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use anyhow::Context;
+
 use nfa::Regex;
 
 #[derive(Clone, Debug)]
@@ -12,7 +14,7 @@ pub struct Substitution {
     pub field: String,
 }
 
-fn validate_braces(input: &str) -> Result<(), String> {
+fn validate_braces(input: &str) -> anyhow::Result<()> {
     let mut cnt: i64 = 0;
     for (position, char) in input.char_indices() {
         match char {
@@ -21,24 +23,24 @@ fn validate_braces(input: &str) -> Result<(), String> {
             _ => (),
         }
         if cnt > 1 {
-            Err(format!(
+            Err(anyhow::anyhow!(
                 "Unexpected open brace at character at position {}",
                 position
             ))?;
         } else if cnt < 0 {
-            Err(format!(
+            Err(anyhow::anyhow!(
                 "Unexpected close brace at character at position {}",
                 position
             ))?;
         }
     }
     if cnt != 0 {
-        Err("Missing closing brace!".to_string())?;
+        Err(anyhow::anyhow!("Missing closing brace!"))?;
     }
     Ok(())
 }
 
-fn split_by_braces(input: &str) -> Result<Vec<&str>, String> {
+fn split_by_braces(input: &str) -> anyhow::Result<Vec<&str>> {
     validate_braces(input)?;
     let mut input = input;
     let mut output = vec![];
@@ -55,7 +57,9 @@ fn split_by_braces(input: &str) -> Result<Vec<&str>, String> {
                 output.push(prefix);
                 input = suffix;
             } else {
-                Err("Not matching parenthesis. This is impossible".to_string())?;
+                Err(anyhow::anyhow!(
+                    "Not matching parenthesis. This is impossible"
+                ))?;
             }
         } else {
             output.push(input);
@@ -180,9 +184,9 @@ impl Ord for QueryToken {
 }
 
 impl QueryToken {
-    fn new(tokens: &[&str]) -> Result<Self, String> {
+    fn new(tokens: &[&str]) -> anyhow::Result<Self> {
         Ok(match tokens {
-            [] | [""] => Err("empty brace parameters")?,
+            [] | [""] => Err(anyhow::anyhow!("empty brace parameters"))?,
             [item, "exact"] => Self::Exact((*item).into()),
             [item, "word"] => Self::Regex((*item).into(), Regex::new(r"\w+")?),
             [item] | [item, "query"] => Self::Regex((*item).into(), Regex::new(r".+")?),
@@ -195,7 +199,7 @@ impl QueryToken {
                 (*type_).into(),
                 (*subtype).into(),
             ),
-            x => Err(format!("unable to parse brace expression {:?}", x))?,
+            x => Err(anyhow::anyhow!("unable to parse brace expression {:?}", x))?,
         })
     }
 }
@@ -207,22 +211,23 @@ pub enum LinkToken {
     Substitution(String, String),
 }
 impl LinkToken {
-    fn new(tokens: &[&str]) -> Result<Self, String> {
+    fn new(tokens: &[&str]) -> anyhow::Result<Self> {
         Ok(match tokens {
-            [] | [""] => Err("empty brace parameters")?,
+            [] | [""] => Err(anyhow::anyhow!("empty brace parameters"))?,
             [item] => Self::Replacement((*item).into()),
             [type_, subtype] => Self::Substitution((*type_).into(), (*subtype).into()),
-            x => Err(format!("unable to parse brace expression {:?}", x))?,
+            x => Err(anyhow::anyhow!("unable to parse brace expression {:?}", x))?,
         })
     }
 }
 
-pub fn parse_query(input: &str, exact: bool) -> Result<Vec<QueryToken>, String> {
+pub fn parse_query(input: &str, exact: bool) -> anyhow::Result<Vec<QueryToken>> {
     split_by_braces(input)?
         .into_iter()
         .flat_map(|item| {
             if let Some(braces) = parse_braces(item) {
-                vec![QueryToken::new(&braces)]
+                vec![QueryToken::new(&braces)
+                    .with_context(|| format!("Invalid brace token: '{}'", item))]
             } else {
                 let constructor = if exact {
                     QueryToken::Exact
@@ -237,12 +242,12 @@ pub fn parse_query(input: &str, exact: bool) -> Result<Vec<QueryToken>, String> 
         .collect()
 }
 
-pub fn parse_link(input: &str) -> Result<Vec<LinkToken>, String> {
+pub fn parse_link(input: &str) -> anyhow::Result<Vec<LinkToken>> {
     split_by_braces(input)?
         .into_iter()
         .map(|item| {
             if let Some(braces) = parse_braces(item) {
-                LinkToken::new(&braces)
+                LinkToken::new(&braces).with_context(|| format!("Invalid brace token: '{}'", item))
             } else {
                 Ok(LinkToken::Exact(item.into()))
             }
@@ -255,7 +260,7 @@ pub fn validate_query_with_link(
     query_str: &str,
     link: &[LinkToken],
     link_str: &str,
-) -> Result<(), String> {
+) -> anyhow::Result<()> {
     let link_replacement_types = link
         .iter()
         .filter_map(|x| match x {
@@ -274,7 +279,7 @@ pub fn validate_query_with_link(
         .difference(&query_replacement_types)
         .collect::<Vec<_>>();
     if !difference.is_empty() {
-        return Err(format!(
+        return Err(anyhow::anyhow!(
             "Following replacements are in the link but not in query: {:?}. Query: '{}', link: '{}'",
             difference, query_str, link_str,
         ));
@@ -297,7 +302,7 @@ pub fn validate_query_with_link(
         .difference(&query_substitution_types)
         .collect::<Vec<_>>();
     if !difference.is_empty() {
-        return Err(format!(
+        return Err(anyhow::anyhow!(
             "Following substitutions are in the link but not in query: {:?}. Query: '{}', link: '{}'",
             difference, query_str, link_str,
         ));

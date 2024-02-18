@@ -67,7 +67,7 @@ pub struct Config<T, R> {
 }
 
 impl Config<String, ()> {
-    pub fn from_config_file(config: ConfigFile<()>) -> Result<Self, String> {
+    pub fn from_config_file(config: ConfigFile<()>) -> anyhow::Result<Self> {
         let ConfigFile {
             fallback,
             behavior,
@@ -97,7 +97,7 @@ impl Config<String, ()> {
 }
 
 impl Config<String, RedirectConfig<String>> {
-    pub fn from_config_file(config: ConfigFile<RedirectConfigFile>) -> Result<Self, String> {
+    pub fn from_config_file(config: ConfigFile<RedirectConfigFile>) -> anyhow::Result<Self> {
         let ConfigFile {
             fallback,
             behavior,
@@ -129,7 +129,7 @@ impl Config<String, RedirectConfig<String>> {
 }
 
 impl RedirectConfig<String> {
-    pub fn from_config_file(config: RedirectConfigFile) -> Result<Self, String> {
+    pub fn from_config_file(config: RedirectConfigFile) -> anyhow::Result<Self> {
         Ok(RedirectConfig {
             substitutions: config.substitutions,
             redirects: config
@@ -138,7 +138,7 @@ impl RedirectConfig<String> {
                 .map(|x| {
                     let mut links = vec![];
                     if x.link.is_some() && !x.links.is_empty() {
-                        return Err(format!(
+                        return Err(anyhow::anyhow!(
                             "Both link and links are non-empty for command '{}'",
                             &x.query
                         ));
@@ -146,7 +146,10 @@ impl RedirectConfig<String> {
                     links.extend(x.link);
                     links.extend(x.links.into_iter());
                     if links.is_empty() {
-                        Err(format!("There are no links for command '{}'", &x.query))
+                        Err(anyhow::anyhow!(
+                            "There are no links for command '{}'",
+                            &x.query
+                        ))
                     } else {
                         Ok(ConfigLinkQuery {
                             query: x.query,
@@ -155,7 +158,7 @@ impl RedirectConfig<String> {
                         })
                     }
                 })
-                .collect::<Result<_, _>>()?,
+                .collect::<anyhow::Result<_>>()?,
         })
     }
 }

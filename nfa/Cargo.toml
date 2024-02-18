@@ -8,4 +8,5 @@ name = "nfa"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-itertools = "0.12.0"
+itertools.workspace = true
+anyhow.workspace = true

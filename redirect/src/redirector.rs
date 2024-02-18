@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::Context;
 use serde::Serialize;
 
 use crate::{parse_link, parse_query, validate_query_with_link, LinkToken, QueryToken};
@@ -26,21 +27,23 @@ impl<L: Clone> ConfigLinkQuery<L> {
 pub fn create_parser(
     redirects: Vec<ConfigLinkQuery<String>>,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
-) -> Result<NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>, String> {
+) -> anyhow::Result<NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>> {
     Ok(NFA::any_of(
         &(redirects
             .into_iter()
             // TODO: replace screw up suggestions
             .map(|c| {
                 // TODO: handle errors here
-                let sentence = parse_query(&c.query, c.exact)?;
+                let sentence = parse_query(&c.query, c.exact)
+                    .with_context(|| format!("Unable to parse query '{}'", c.query))?;
                 let links = c
                     .links
                     .iter()
                     .map(|link| {
-                        let parsed_link: Vec<LinkToken> = parse_link(link)?;
+                        let parsed_link: Vec<LinkToken> = parse_link(link)
+                            .with_context(|| format!("Unable to parse link '{}'", link))?;
                         validate_query_with_link(&sentence, &c.query, &parsed_link, link)?;
-                        Result::<_, String>::Ok(parsed_link)
+                        anyhow::Result::<_>::Ok(parsed_link)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let c = ConfigLinkQuery {
@@ -100,7 +103,7 @@ pub fn create_parser(
                 }
                 Ok(NFA::chain(&parsers).with_payload_for_final_nodes(&(c.links, sentence)))
             })
-            .collect::<Result<Vec<_>, String>>())?,
+            .collect::<anyhow::Result<Vec<_>>>())?,
     ))
 }
 

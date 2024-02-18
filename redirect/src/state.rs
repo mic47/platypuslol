@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use anyhow::Context;
+
 use nfa::NFA;
 
 use crate::{
@@ -20,7 +22,7 @@ pub struct CommonAppState {
 }
 
 impl CommonAppState {
-    pub fn new(loaded_config: Config<String, RedirectConfig<String>>) -> Result<Self, String> {
+    pub fn new(loaded_config: Config<String, RedirectConfig<String>>) -> anyhow::Result<Self> {
         let Config {
             ref fallback,
             ref behavior,
@@ -33,9 +35,10 @@ impl CommonAppState {
                 for subst_key in ext_conf.substitutions_to_inherit.iter() {
                     if let Some(subst_value) = conf.substitutions.get(subst_key) {
                         if substitutions.contains_key(subst_key) {
-                            return Err(format!(
+                            return Err(anyhow::anyhow!(
                                 "Substitution key '{}' from '{:?}' already exists",
-                                subst_key, t
+                                subst_key,
+                                t
                             ));
                         } else {
                             substitutions.insert(subst_key.clone(), subst_value.clone());
@@ -45,7 +48,7 @@ impl CommonAppState {
             }
         }
         let mut parsers = vec![create_parser(redirects.redirects.clone(), substitutions)
-            .map_err(|err| format!("Unable to create parser from main config: {}", err))?];
+            .context("Unable to create parser from main config")?];
         for (url, config) in external_configurations.iter() {
             if !config.enabled {
                 continue;
@@ -56,7 +59,7 @@ impl CommonAppState {
                     redirects.substitutions.clone(),
                     config.prefix.clone(),
                 )
-                .map_err(|err| format!("Unable to create parser from config {:?}: {}", url, err));
+                .with_context(|| format!("Unable to create parser from config {:?}", url));
                 match url {
                     ConfigUrl::Builtin { path: _ } | ConfigUrl::Local { path: _ } => {
                         parsers.push(maybe_parser?);
@@ -81,12 +84,7 @@ impl CommonAppState {
                     }],
                     Default::default(),
                 )
-                .map_err(|err| {
-                    format!(
-                        "Unable to create parser {}. Substitution should be named 'query'",
-                        err
-                    )
-                })?,
+                .context("Unable to create parser. Substitution should be name 'query'.")?,
             },
             loaded_config,
         })
@@ -126,15 +124,14 @@ fn create_parser_with_optional_prefix(
     redirects: Vec<ConfigLinkQuery<String>>,
     substitutions: HashMap<String, Vec<HashMap<String, String>>>,
     prefix: Option<String>,
-) -> Result<NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>, String> {
+) -> anyhow::Result<NFA<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>> {
     if let Some(prefix) = prefix {
         create_parser(
             redirects.into_iter().map(|x| x.prefix(&prefix)).collect(),
             substitutions,
         )
-        .map_err(|err| format!("Unable to create parser {}", err))
+        .context("Unable to create parser")
     } else {
-        create_parser(redirects, substitutions)
-            .map_err(|err| format!("Unable to create parser {}", err))
+        create_parser(redirects, substitutions).context("Unable to create parser")
     }
 }

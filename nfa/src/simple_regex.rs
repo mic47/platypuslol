@@ -26,11 +26,11 @@ impl<'a> ReMatch<'a> {
 }
 
 impl Regex {
-    pub fn new(regex: &str) -> Result<Self, String> {
+    pub fn new(regex: &str) -> anyhow::Result<Self> {
         match regex {
             r"\w+" => Ok(Regex::Word),
             r".+" => Ok(Regex::RestOfTheString),
-            _ => Err(format!("Unsupported regex '{regex}'")),
+            _ => Err(anyhow::anyhow!("Unsupported regex '{regex}'")),
         }
     }
 

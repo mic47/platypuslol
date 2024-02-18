@@ -515,6 +515,7 @@ dependencies = [
 name = "nfa"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "itertools",
 ]
 
@@ -623,6 +624,7 @@ dependencies = [
 name = "redirect"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "nfa",
  "serde",
 ]
