@@ -18,6 +18,8 @@ You can edit then `~/.config/platypus-lol/commands.conf` to your liking.
 
 ## Extension
 
+**Warning:** Extension currently does not work. I plan to remove it, as it will allow me to simplify the code base.
+
 To make extension, run `make wasm`, and then load it unpacked into chrome. Currently it's not in chrome store (work in progress).
 
 ## TODO
