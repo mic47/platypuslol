@@ -747,7 +747,11 @@ fn config_form(section: &mut Node, params: &HashMap<String, String>) -> anyhow::
         .map(|q| query.attr(&format!("value='{}'", q)));
     form.br();
     writeln!(form, "Links: ")?;
-    let mut links = form.textarea().attr("name='links'").attr("rows=1");
+    let mut links = form
+        .textarea()
+        .attr("name='links'")
+        .attr("rows=2")
+        .attr("cols=80");
     params.get("links").map(|q| writeln!(links, "{}", q));
     form.br();
     writeln!(
