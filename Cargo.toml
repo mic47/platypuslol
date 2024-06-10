@@ -18,7 +18,7 @@ redirect = { path = "redirect" }
 tool = { path = "tool" }
 server = { path = "server" }
 
-anyhow = "1.0.82"
+anyhow = "1.0.86"
 clap = { version = "4.5.4", features = ["derive"]}
 futures-util = "0.3.30"
 html-builder = "0.5.1"
