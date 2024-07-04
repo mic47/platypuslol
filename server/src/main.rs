@@ -427,7 +427,7 @@ fn list_get_groups<'a>(
     let grouped = first
         .into_iter()
         .chain(failed_matches.into_iter().chain(matches))
-        .group_by(|x| x.meta.command.clone());
+        .chunk_by(|x| x.meta.command.clone());
     let grouped = grouped.into_iter().collect::<Vec<_>>();
 
     let mut groups = vec![];
@@ -597,7 +597,7 @@ fn split_by_tokens(list: Vec<NestedState>, max_size: usize) -> Vec<NestedState> 
         let mut out = vec![];
         for (tokens, group) in list
             .into_iter()
-            .group_by(|x| match x {
+            .chunk_by(|x| match x {
                 NestedList::Element(item) => item
                     .meta
                     .command
