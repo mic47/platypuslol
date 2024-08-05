@@ -919,7 +919,10 @@ fn config_entry(
     for (sname, subst) in config.substitutions.iter() {
         writeln!(section.h3(), "Substitution: '{}'", sname)?;
         if substitutions_to_inherit.contains(sname) {
-            writeln!(section, "ℹ️ This substutution is usable in the main config.")?;
+            writeln!(
+                section,
+                "ℹ️ This substutution is usable in the main config."
+            )?;
         }
         let mut keys = HashSet::new();
         subst.iter().for_each(|x| keys.extend(x.keys()));
