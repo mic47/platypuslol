@@ -12,12 +12,13 @@ use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use itertools::Itertools;
+use nfa::{Parsed, Suggestion};
 use notify::{Event, INotifyWatcher, RecursiveMode, Watcher};
 
 use redirect::{
     resolve_parsed_output, resolve_suggestion_output, CommonAppState, Config, ConfigLinkQuery,
-    ConfigLinkQueryFile, ConfigUrl, ExternalParser, QueryToken, RedirectConfig,
-    ResolvedOutputMetadata,
+    ConfigLinkQueryFile, ConfigUrl, ExternalParser, LinkToken, QueryToken, RedirectConfig,
+    ResolvedOutputMetadata, ResolvedSuggestionOutput,
 };
 use tokio::runtime::Runtime;
 
@@ -372,61 +373,75 @@ fn list_get_groups<'a>(
         }
     }
 
-    let (used_query, (parsed, suggested)) = param_q
-        .and_then(|q| {
+    let (used_query, parsed_and_suggested) = param_q
+        .map(|q| {
             let (p, s) = state.parser.parse_full_and_suggest(q);
             if p.is_empty() && s.is_empty() {
-                None
+                (None, None)
             } else {
-                Some((Some(q), (p, s)))
+                (Some(q), Some((p, s)))
             }
         })
-        .unwrap_or_else(|| (None, state.parser.parse_full_and_suggest("")));
-    let mut matches = vec![];
-    for (p, meta) in parsed
-        .into_iter()
-        .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
-    {
-        matches.push(NestedStateItem {
-            description: p.description,
-            links: Some(p.links),
-            meta,
-            key: None,
-            suffix_text: "",
-        })
-    }
+        .unwrap_or((None, None));
+    //.unwrap_or_else(|| (None, state.parser.parse_full_and_suggest("")));
     let mut visited: HashSet<_> = HashSet::default();
-    for (s, meta) in suggested
-        .into_iter()
-        .map(|x| resolve_suggestion_output(x, &failed_query.map(Into::into)))
-    {
-        if !visited.insert(s.clone()) {
-            continue;
+    let mut all_matches = vec![];
+    let mut first = None;
+    if let Some((parsed, suggested)) = parsed_and_suggested {
+        let mut matches =
+            get_matches_from_parse_and_suggest(parsed, suggested, &mut visited, failed_query);
+        first = matches.first().cloned().map(|item| NestedStateItem {
+            key: Some(("[i] ".to_string(), "i".to_string())),
+            suffix_text: " <- F[i]rst match",
+            ..item
+        });
+        matches.sort_by_key(|x| {
+            (
+                x.meta.command.clone(),
+                x.description.clone(),
+                x.links.clone(),
+            )
+        });
+        all_matches.extend(matches);
+    } else {
+        let q = param_q.unwrap_or("");
+        for prefix_len in (0..q.len() + 1).rev() {
+            if let Some((q, _)) = q.split_at_checked(prefix_len) {
+                let (parsed, suggested) = state.parser.parse_full_and_suggest(q);
+                let mut matches = get_matches_from_parse_and_suggest(
+                    parsed,
+                    suggested,
+                    &mut visited,
+                    failed_query,
+                );
+                matches.sort_by_key(|x| {
+                    (
+                        x.meta.command.clone(),
+                        x.description.clone(),
+                        x.links.clone(),
+                    )
+                });
+                if !matches.is_empty() {
+                    all_matches.push(NestedStateItem {
+                        description: format!("Matches & suggestions for prefix query: \"{}\"", q),
+                        links: None,
+                        meta: ResolvedOutputMetadata {
+                            command: vec![],
+                            query: HashMap::new(),
+                            substitutions: HashMap::new(),
+                        },
+                        suffix_text: "",
+                        key: None,
+                    });
+                    all_matches.extend(matches);
+                }
+            }
         }
-        matches.push(NestedStateItem {
-            description: s.description,
-            links: s.links,
-            meta,
-            key: None,
-            suffix_text: "",
-        })
-    }
-    let first = matches.first().cloned().map(|item| NestedStateItem {
-        key: Some(("[i] ".to_string(), "i".to_string())),
-        suffix_text: " <- F[i]rst match",
-        ..item
-    });
-    matches.sort_by_key(|x| {
-        (
-            x.meta.command.clone(),
-            x.description.clone(),
-            x.links.clone(),
-        )
-    });
+    };
 
     let grouped = first
         .into_iter()
-        .chain(failed_matches.into_iter().chain(matches))
+        .chain(failed_matches.into_iter().chain(all_matches))
         .chunk_by(|x| x.meta.command.clone());
     let grouped = grouped.into_iter().collect::<Vec<_>>();
 
@@ -451,6 +466,44 @@ fn list_get_groups<'a>(
             FAST_SHORTCUT_CHARACTERS.len() * FAST_SHORTCUT_CHARACTERS.len(),
         )),
     )
+}
+
+#[allow(clippy::type_complexity)]
+fn get_matches_from_parse_and_suggest<'a>(
+    parsed: Vec<Parsed<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>>,
+    suggested: Vec<Suggestion<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>>,
+    visited: &mut HashSet<ResolvedSuggestionOutput>,
+    failed_query: Option<&str>,
+) -> Vec<NestedStateItem<'a>> {
+    let mut matches = vec![];
+    for (p, meta) in parsed
+        .into_iter()
+        .map(|x| resolve_parsed_output(x, &failed_query.map(Into::into)))
+    {
+        matches.push(NestedStateItem {
+            description: p.description,
+            links: Some(p.links),
+            meta,
+            key: None,
+            suffix_text: "",
+        });
+    }
+    for (s, meta) in suggested
+        .into_iter()
+        .map(|x| resolve_suggestion_output(x, &failed_query.map(Into::into)))
+    {
+        if !visited.insert(s.clone()) {
+            continue;
+        }
+        matches.push(NestedStateItem {
+            description: s.description,
+            links: s.links,
+            meta,
+            key: None,
+            suffix_text: "",
+        });
+    }
+    matches
 }
 
 fn list(
