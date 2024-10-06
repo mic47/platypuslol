@@ -463,14 +463,15 @@ pub struct Suggestion<'a, T> {
 #[derive(Clone, Debug)]
 struct BFSSuggestions<'a, T> {
     pub node: &'a Node<T>,
-    pub suggestions_and_traces: Vec<Vec<(&'a str, Option<Trace<&'a T>>)>>,
+    pub suggestions_and_traces: List<Vec<(&'a str, Option<Trace<&'a T>>)>>,
 }
 
 impl<'a, T> BFSSuggestions<'a, T> {
     pub fn get_suggestions(&self) -> Vec<Suggestion<'a, T>> {
         let suggestions_and_traces = self
             .suggestions_and_traces
-            .iter()
+            .clone_to_vec()
+            .into_iter()
             .filter(|x| !x.is_empty())
             .collect::<Vec<_>>();
         if suggestions_and_traces.is_empty() {
@@ -653,11 +654,13 @@ impl<T: std::fmt::Debug> NFA<T> {
                 suggestion_states.push_back(BFSSuggestions {
                     node,
                     // TODO Fix this
-                    suggestions_and_traces: vec![payloads
-                        .clone_to_vec()
-                        .into_iter()
-                        .map(|p| ("", Some(p)))
-                        .collect()],
+                    suggestions_and_traces: List::new(
+                        payloads
+                            .clone_to_vec()
+                            .into_iter()
+                            .map(|p| ("", Some(p)))
+                            .collect(),
+                    ),
                 })
             }
             if let Some(ref payload) = node.payload {
