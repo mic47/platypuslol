@@ -172,7 +172,8 @@ pub fn resolve_parsed_output(
     p: Parsed<(Vec<Vec<LinkToken>>, Vec<QueryToken>)>,
     default_replacement: &Option<String>,
 ) -> (ResolvedParsedOutput, ResolvedOutputMetadata) {
-    let (matches, substitutions) = process_trace(p.trace);
+    // TODO: check if you need clone to vec
+    let (matches, substitutions) = process_trace(p.trace.clone_to_vec());
     (
         ResolvedParsedOutput {
             score: p.score,

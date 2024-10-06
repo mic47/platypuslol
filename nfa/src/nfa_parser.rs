@@ -1,6 +1,7 @@
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet, VecDeque},
+    rc::Rc,
 };
 
 use itertools::Itertools;
@@ -448,7 +449,7 @@ impl<T: std::fmt::Debug> NFA<T> {
 pub struct Parsed<'a, T> {
     pub payload: &'a T,
     pub score: f64,
-    pub trace: Vec<Trace<&'a T>>,
+    pub trace: List<Trace<&'a T>>,
 }
 
 #[derive(Clone, Debug)]
@@ -510,11 +511,55 @@ impl<'a, T> BFSSuggestions<'a, T> {
     }
 }
 
+#[derive(Debug)]
+struct ListItem<T> {
+    data: T,
+    prev: Option<Rc<ListItem<T>>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct List<T> {
+    list: Option<Rc<ListItem<T>>>,
+}
+
+impl<T> Default for List<T> {
+    fn default() -> Self {
+        Self { list: None }
+    }
+}
+
+impl<T> List<T> {
+    pub fn new(data: T) -> Self {
+        Self {
+            list: Some(Rc::new(ListItem { data, prev: None })),
+        }
+    }
+    pub fn push(&mut self, data: T) {
+        let new_list = Some(Rc::new(ListItem {
+            data,
+            prev: self.list.clone(),
+        }));
+        self.list = new_list;
+    }
+}
+impl<T: Clone> List<T> {
+    pub fn clone_to_vec(&self) -> Vec<T> {
+        let mut out = vec![];
+        let mut list = self.list.clone();
+        while let Some(item) = list {
+            out.push(item.data.clone());
+            list = item.prev.clone();
+        }
+        out.reverse();
+        out
+    }
+}
+
 struct ParseState<'a, 'b, T> {
     node: &'a Node<T>,
     unparsed_string: &'b str,
     score: f64,
-    payloads: Vec<Trace<&'a T>>,
+    payloads: List<Trace<&'a T>>,
 }
 
 impl<T: std::fmt::Debug> NFA<T> {
@@ -586,14 +631,14 @@ impl<T: std::fmt::Debug> NFA<T> {
         &'a self,
         input: &'b str,
     ) -> (
-        Vec<(&'a T, &'b str, f64, Vec<Trace<&'a T>>)>,
+        Vec<(&'a T, &'b str, f64, List<Trace<&'a T>>)>,
         VecDeque<BFSSuggestions<T>>,
     ) {
         let mut state = VecDeque::from([ParseState {
             node: &self.nodes[self.root],
             unparsed_string: input,
             score: 0.,
-            payloads: vec![],
+            payloads: List::default(),
         }]);
         let mut output = vec![];
         let mut suggestion_states: VecDeque<BFSSuggestions<T>> = VecDeque::from([]);
@@ -607,8 +652,9 @@ impl<T: std::fmt::Debug> NFA<T> {
             if unparsed_string.is_empty() {
                 suggestion_states.push_back(BFSSuggestions {
                     node,
+                    // TODO Fix this
                     suggestions_and_traces: vec![payloads
-                        .clone()
+                        .clone_to_vec()
                         .into_iter()
                         .map(|p| ("", Some(p)))
                         .collect()],
