@@ -514,6 +514,13 @@ impl<'a, T> BFSSuggestions<'a, T> {
     }
 }
 
+struct ParseState<'a, 'b, T> {
+    node: &'a Node<T>,
+    unparsed_string: &'b str,
+    score: f64,
+    payloads: Vec<Trace<&'a T>>,
+}
+
 impl<T: std::fmt::Debug> NFA<T> {
     pub fn parse_full<'a>(&'a self, input: &str) -> Vec<&'a T> {
         self.parse(input)
@@ -527,11 +534,22 @@ impl<T: std::fmt::Debug> NFA<T> {
         input: &str,
     ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
         // TODO: collect payloads
-        let mut state = VecDeque::from([(&self.nodes[self.root], input, 0., vec![])]);
+        let mut state = VecDeque::from([ParseState {
+            node: &self.nodes[self.root],
+            unparsed_string: input,
+            score: 0.,
+            payloads: vec![],
+        }]);
         let mut output = vec![];
         let mut suggestion_states: VecDeque<BFSSuggestions<T>> = VecDeque::from([]);
-        while let Some((node, string, score, mut payloads)) = state.pop_front() {
-            if string.is_empty() {
+        while let Some(ParseState {
+            node,
+            unparsed_string,
+            score,
+            mut payloads,
+        }) = state.pop_front()
+        {
+            if unparsed_string.is_empty() {
                 suggestion_states.push_back(BFSSuggestions {
                     node,
                     suggestions_and_traces: vec![payloads
@@ -546,18 +564,23 @@ impl<T: std::fmt::Debug> NFA<T> {
             }
             if node.is_final {
                 if let Some(ref payload) = node.payload {
-                    output.push((payload, string, score, payloads.clone()));
+                    output.push((payload, unparsed_string, score, payloads.clone()));
                 } else {
                     // TODO: what is it's missing, or have value and not final...
                 }
             }
-            state.extend(self.node_parse(node, string).into_iter().map(
+            state.extend(self.node_parse(node, unparsed_string).into_iter().map(
                 |(node, rest, edge_score, edge_payload)| {
                     let mut payloads = payloads.clone();
                     if let Some(edge_payload) = edge_payload {
                         payloads.push(Trace::Edge(edge_payload));
                     }
-                    (node, rest, score + edge_score, payloads)
+                    ParseState {
+                        node,
+                        unparsed_string: rest,
+                        score: score + edge_score,
+                        payloads,
+                    }
                 },
             ));
         }

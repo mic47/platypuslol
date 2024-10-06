@@ -383,7 +383,6 @@ fn list_get_groups<'a>(
             }
         })
         .unwrap_or((None, None));
-    //.unwrap_or_else(|| (None, state.parser.parse_full_and_suggest("")));
     let mut visited: HashSet<_> = HashSet::default();
     let mut all_matches = vec![];
     let mut first = None;
