@@ -14,10 +14,10 @@ fn test_non_empty_prefixes() {
     let parser = NFA::match_non_empty_prefixes("foo").with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     assert_eq!(parser.parse("f"), vec![(&(), "")],);
-    assert_eq!(parser.parse_full("foo"), vec![&()]);
-    assert_eq!(parser.parse_full("fo"), vec![&()],);
-    assert_eq!(parser.parse_full("foobar"), empty);
-    assert_eq!(parser.parse_full("fobar"), empty);
+    assert_eq!(parser.parse_full_for_tests("foo"), vec![&()]);
+    assert_eq!(parser.parse_full_for_tests("fo"), vec![&()],);
+    assert_eq!(parser.parse_full_for_tests("foobar"), empty);
+    assert_eq!(parser.parse_full_for_tests("fobar"), empty);
     assert_eq!(parser.parse("fbar"), vec![(&(), "bar")],);
     assert_eq!(parser.parse("obar"), vec![],);
     assert_eq!(parser.parse("bar"), vec![],);
@@ -33,12 +33,12 @@ fn test_chain_2_elements() {
     .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
-    assert_eq!(parser.parse_full("f"), empty);
-    assert_eq!(parser.parse_full("fb"), found);
-    assert_eq!(parser.parse_full("fobar"), found);
-    assert_eq!(parser.parse_full("foobar"), found);
-    assert_eq!(parser.parse_full("fooar"), empty);
-    assert_eq!(parser.parse_full("foobar_extra"), empty);
+    assert_eq!(parser.parse_full_for_tests("f"), empty);
+    assert_eq!(parser.parse_full_for_tests("fb"), found);
+    assert_eq!(parser.parse_full_for_tests("fobar"), found);
+    assert_eq!(parser.parse_full_for_tests("foobar"), found);
+    assert_eq!(parser.parse_full_for_tests("fooar"), empty);
+    assert_eq!(parser.parse_full_for_tests("foobar_extra"), empty);
     assert_eq!(parser.parse("foob_extra"), vec![(&(), "_extra")]);
 }
 
@@ -52,14 +52,14 @@ fn test_chain_3_elements_with_non_zero_space() {
     .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
-    assert_eq!(parser.parse_full("f"), empty);
-    assert_eq!(parser.parse_full("f b"), found);
-    assert_eq!(parser.parse_full("fb"), empty);
-    assert_eq!(parser.parse_full("fo bar"), found);
-    assert_eq!(parser.parse_full("fobar"), empty);
-    assert_eq!(parser.parse_full("foo bar"), found);
-    assert_eq!(parser.parse_full("fooar"), empty);
-    assert_eq!(parser.parse_full("foobar_extra"), empty);
+    assert_eq!(parser.parse_full_for_tests("f"), empty);
+    assert_eq!(parser.parse_full_for_tests("f b"), found);
+    assert_eq!(parser.parse_full_for_tests("fb"), empty);
+    assert_eq!(parser.parse_full_for_tests("fo bar"), found);
+    assert_eq!(parser.parse_full_for_tests("fobar"), empty);
+    assert_eq!(parser.parse_full_for_tests("foo bar"), found);
+    assert_eq!(parser.parse_full_for_tests("fooar"), empty);
+    assert_eq!(parser.parse_full_for_tests("foobar_extra"), empty);
     assert_eq!(parser.parse("foo b_extra"), vec![(&(), "_extra")]);
     assert_eq!(parser.parse("foob_extra"), vec![]);
 }
@@ -74,14 +74,14 @@ fn test_chain_3_elements_with_zero_space() {
     .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
-    assert_eq!(parser.parse_full("f"), empty);
-    assert_eq!(parser.parse_full("f b"), found);
-    assert_eq!(parser.parse_full("fb"), found);
-    assert_eq!(parser.parse_full("fo bar"), found);
-    assert_eq!(parser.parse_full("fobar"), found);
-    assert_eq!(parser.parse_full("foo bar"), found);
-    assert_eq!(parser.parse_full("fooar"), empty);
-    assert_eq!(parser.parse_full("foobar_extra"), empty);
+    assert_eq!(parser.parse_full_for_tests("f"), empty);
+    assert_eq!(parser.parse_full_for_tests("f b"), found);
+    assert_eq!(parser.parse_full_for_tests("fb"), found);
+    assert_eq!(parser.parse_full_for_tests("fo bar"), found);
+    assert_eq!(parser.parse_full_for_tests("fobar"), found);
+    assert_eq!(parser.parse_full_for_tests("foo bar"), found);
+    assert_eq!(parser.parse_full_for_tests("fooar"), empty);
+    assert_eq!(parser.parse_full_for_tests("foobar_extra"), empty);
     assert_eq!(parser.parse("foo b_extra"), vec![(&(), "_extra")]);
     assert_eq!(parser.parse("foob_extra"), vec![(&(), "_extra")]);
 }
@@ -96,10 +96,10 @@ fn test_any_of() {
     .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     let found = vec![&()];
-    assert_eq!(parser.parse_full("f"), vec![&(), &()]);
-    assert_eq!(parser.parse_full("b"), empty);
-    assert_eq!(parser.parse_full("bar"), found);
-    assert_eq!(parser.parse_full("fe"), found);
+    assert_eq!(parser.parse_full_for_tests("f"), vec![&(), &()]);
+    assert_eq!(parser.parse_full_for_tests("b"), empty);
+    assert_eq!(parser.parse_full_for_tests("bar"), found);
+    assert_eq!(parser.parse_full_for_tests("fe"), found);
 
     assert_eq!(parser.parse("f"), vec![(&(), ""), (&(), "")]);
 

@@ -522,10 +522,12 @@ struct ParseState<'a, 'b, T> {
 }
 
 impl<T: std::fmt::Debug> NFA<T> {
-    pub fn parse_full<'a>(&'a self, input: &str) -> Vec<&'a T> {
-        self.parse(input)
+    #[cfg(test)]
+    pub fn parse_full_for_tests<'a>(&'a self, input: &str) -> Vec<&'a T> {
+        self.parse_full_and_suggest(input)
+            .0
             .into_iter()
-            .filter_map(|x| if x.1.is_empty() { Some(x.0) } else { None })
+            .map(|x| x.payload)
             .collect()
     }
 
