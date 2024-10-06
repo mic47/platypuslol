@@ -518,13 +518,35 @@ struct ParseState<'a, 'b, T> {
 }
 
 impl<T: std::fmt::Debug> NFA<T> {
-    #[cfg(test)]
-    pub fn parse_full_for_tests<'a>(&'a self, input: &str) -> Vec<&'a T> {
-        self.parse_full_and_suggest(input)
-            .0
+    pub fn parse_full_and_suggest<'a>(
+        &'a self,
+        input: &str,
+    ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
+        // TODO: collect payloads
+        let (output, suggestion_states) = self.parse_impl(input);
+
+        let mut output: Vec<_> = output
             .into_iter()
-            .map(|x| x.payload)
-            .collect()
+            .filter_map(|x| {
+                if x.1.is_empty() {
+                    Some(Parsed {
+                        payload: x.0,
+                        score: x.2,
+                        trace: x.3,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        output.sort_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(Ordering::Greater)
+                .reverse()
+        });
+        let suggestions = self.suggest_impl(suggestion_states);
+        (output, suggestions)
     }
 
     fn suggest_impl<'a>(
@@ -620,43 +642,21 @@ impl<T: std::fmt::Debug> NFA<T> {
         (output, suggestion_states)
     }
 
-    pub fn parse_full_and_suggest<'a>(
-        &'a self,
-        input: &str,
-    ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
-        // TODO: collect payloads
-        let (output, suggestion_states) = self.parse_impl(input);
-
-        let mut output: Vec<_> = output
-            .into_iter()
-            .filter_map(|x| {
-                if x.1.is_empty() {
-                    Some(Parsed {
-                        payload: x.0,
-                        score: x.2,
-                        trace: x.3,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
-        output.sort_by(|a, b| {
-            a.score
-                .partial_cmp(&b.score)
-                .unwrap_or(Ordering::Greater)
-                .reverse()
-        });
-        let suggestions = self.suggest_impl(suggestion_states);
-        (output, suggestions)
-    }
-
     #[cfg(test)]
     pub fn parse_for_tests<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)> {
         self.parse_impl(input)
             .0
             .into_iter()
             .map(|x| (x.0, x.1))
+            .collect()
+    }
+
+    #[cfg(test)]
+    pub fn parse_full_for_tests<'a>(&'a self, input: &str) -> Vec<&'a T> {
+        self.parse_full_and_suggest(input)
+            .0
+            .into_iter()
+            .map(|x| x.payload)
             .collect()
     }
 }
