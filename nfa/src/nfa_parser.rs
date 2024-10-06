@@ -529,6 +529,38 @@ impl<T: std::fmt::Debug> NFA<T> {
             .collect()
     }
 
+    fn suggest<'a>(
+        &'a self,
+        mut suggestion_states: VecDeque<BFSSuggestions<'a, T>>,
+    ) -> Vec<Suggestion<'a, T>> {
+        // BFS for finding suggestions
+        // TODO: suggestions are ugly here, i.e. for shortcuts, we would like to have something
+        // else for suggestions.
+        let mut suggestions = vec![];
+        let mut visited: HashSet<NodeIndex> = Default::default();
+        let mut skip_suggesting_until = suggestion_states.len();
+        while let Some(suggestion_state) = suggestion_states.pop_front() {
+            if suggestion_state.node.is_final && skip_suggesting_until == 0 {
+                suggestions.extend(suggestion_state.get_suggestions());
+            }
+            skip_suggesting_until = skip_suggesting_until.saturating_sub(1);
+            let mut to_visit: HashSet<NodeIndex> = Default::default();
+            for (texts_with_traces, target_nodes) in suggestion_state.node.get_suggestions() {
+                for target_node in target_nodes.iter().filter(|x| !visited.contains(*x)) {
+                    to_visit.insert(*target_node);
+                    let mut st = suggestion_state.suggestions_and_traces.clone();
+                    st.push(texts_with_traces.clone());
+                    suggestion_states.push_back(BFSSuggestions {
+                        node: &self.nodes[*target_node],
+                        suggestions_and_traces: st,
+                    });
+                }
+            }
+            visited.extend(to_visit);
+        }
+        suggestions
+    }
+
     pub fn parse_full_and_suggest<'a>(
         &'a self,
         input: &str,
@@ -584,31 +616,6 @@ impl<T: std::fmt::Debug> NFA<T> {
                 },
             ));
         }
-        // BFS for finding suggestions
-        // TODO: suggestions are ugly here, i.e. for shortcuts, we would like to have something
-        // else for suggestions.
-        let mut suggestions = vec![];
-        let mut visited: HashSet<NodeIndex> = Default::default();
-        let mut skip_suggesting_until = suggestion_states.len();
-        while let Some(suggestion_state) = suggestion_states.pop_front() {
-            if suggestion_state.node.is_final && skip_suggesting_until == 0 {
-                suggestions.extend(suggestion_state.get_suggestions());
-            }
-            skip_suggesting_until = skip_suggesting_until.saturating_sub(1);
-            let mut to_visit: HashSet<NodeIndex> = Default::default();
-            for (texts_with_traces, target_nodes) in suggestion_state.node.get_suggestions() {
-                for target_node in target_nodes.iter().filter(|x| !visited.contains(*x)) {
-                    to_visit.insert(*target_node);
-                    let mut st = suggestion_state.suggestions_and_traces.clone();
-                    st.push(texts_with_traces.clone());
-                    suggestion_states.push_back(BFSSuggestions {
-                        node: &self.nodes[*target_node],
-                        suggestions_and_traces: st,
-                    });
-                }
-            }
-            visited.extend(to_visit);
-        }
 
         let mut output: Vec<_> = output
             .into_iter()
@@ -630,6 +637,7 @@ impl<T: std::fmt::Debug> NFA<T> {
                 .unwrap_or(Ordering::Greater)
                 .reverse()
         });
+        let suggestions = self.suggest(suggestion_states);
         (output, suggestions)
     }
 }
