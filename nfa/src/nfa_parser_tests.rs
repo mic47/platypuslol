@@ -3,25 +3,25 @@ use super::*;
 #[test]
 fn test_match_string() {
     let parser = NFA::match_string("foo").with_payload_for_final_nodes(&());
-    assert_eq!(parser.parse("foo"), vec![(&(), "")],);
-    assert_eq!(parser.parse("foobar"), vec![(&(), "bar")],);
-    assert_eq!(parser.parse(""), vec![]);
-    assert_eq!(parser.parse("f"), vec![]);
+    assert_eq!(parser.parse_for_tests("foo"), vec![(&(), "")],);
+    assert_eq!(parser.parse_for_tests("foobar"), vec![(&(), "bar")],);
+    assert_eq!(parser.parse_for_tests(""), vec![]);
+    assert_eq!(parser.parse_for_tests("f"), vec![]);
 }
 
 #[test]
 fn test_non_empty_prefixes() {
     let parser = NFA::match_non_empty_prefixes("foo").with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
-    assert_eq!(parser.parse("f"), vec![(&(), "")],);
+    assert_eq!(parser.parse_for_tests("f"), vec![(&(), "")],);
     assert_eq!(parser.parse_full_for_tests("foo"), vec![&()]);
     assert_eq!(parser.parse_full_for_tests("fo"), vec![&()],);
     assert_eq!(parser.parse_full_for_tests("foobar"), empty);
     assert_eq!(parser.parse_full_for_tests("fobar"), empty);
-    assert_eq!(parser.parse("fbar"), vec![(&(), "bar")],);
-    assert_eq!(parser.parse("obar"), vec![],);
-    assert_eq!(parser.parse("bar"), vec![],);
-    assert_eq!(parser.parse(""), vec![]);
+    assert_eq!(parser.parse_for_tests("fbar"), vec![(&(), "bar")],);
+    assert_eq!(parser.parse_for_tests("obar"), vec![],);
+    assert_eq!(parser.parse_for_tests("bar"), vec![],);
+    assert_eq!(parser.parse_for_tests(""), vec![]);
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn test_chain_2_elements() {
     assert_eq!(parser.parse_full_for_tests("foobar"), found);
     assert_eq!(parser.parse_full_for_tests("fooar"), empty);
     assert_eq!(parser.parse_full_for_tests("foobar_extra"), empty);
-    assert_eq!(parser.parse("foob_extra"), vec![(&(), "_extra")]);
+    assert_eq!(parser.parse_for_tests("foob_extra"), vec![(&(), "_extra")]);
 }
 
 #[test]
@@ -60,8 +60,8 @@ fn test_chain_3_elements_with_non_zero_space() {
     assert_eq!(parser.parse_full_for_tests("foo bar"), found);
     assert_eq!(parser.parse_full_for_tests("fooar"), empty);
     assert_eq!(parser.parse_full_for_tests("foobar_extra"), empty);
-    assert_eq!(parser.parse("foo b_extra"), vec![(&(), "_extra")]);
-    assert_eq!(parser.parse("foob_extra"), vec![]);
+    assert_eq!(parser.parse_for_tests("foo b_extra"), vec![(&(), "_extra")]);
+    assert_eq!(parser.parse_for_tests("foob_extra"), vec![]);
 }
 
 #[test]
@@ -82,8 +82,8 @@ fn test_chain_3_elements_with_zero_space() {
     assert_eq!(parser.parse_full_for_tests("foo bar"), found);
     assert_eq!(parser.parse_full_for_tests("fooar"), empty);
     assert_eq!(parser.parse_full_for_tests("foobar_extra"), empty);
-    assert_eq!(parser.parse("foo b_extra"), vec![(&(), "_extra")]);
-    assert_eq!(parser.parse("foob_extra"), vec![(&(), "_extra")]);
+    assert_eq!(parser.parse_for_tests("foo b_extra"), vec![(&(), "_extra")]);
+    assert_eq!(parser.parse_for_tests("foob_extra"), vec![(&(), "_extra")]);
 }
 
 #[test]
@@ -101,8 +101,11 @@ fn test_any_of() {
     assert_eq!(parser.parse_full_for_tests("bar"), found);
     assert_eq!(parser.parse_full_for_tests("fe"), found);
 
-    assert_eq!(parser.parse("f"), vec![(&(), ""), (&(), "")]);
+    assert_eq!(parser.parse_for_tests("f"), vec![(&(), ""), (&(), "")]);
 
-    assert_eq!(parser.parse("fbar"), vec![(&(), "bar"), (&(), "bar")]);
-    assert_eq!(parser.parse(""), vec![]);
+    assert_eq!(
+        parser.parse_for_tests("fbar"),
+        vec![(&(), "bar"), (&(), "bar")]
+    );
+    assert_eq!(parser.parse_for_tests(""), vec![]);
 }

@@ -444,10 +444,6 @@ impl<T: std::fmt::Debug> NFA<T> {
     }
 }
 
-pub trait Parser<T> {
-    fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)>;
-}
-
 #[derive(Clone, Debug)]
 pub struct Parsed<'a, T> {
     pub payload: &'a T,
@@ -654,10 +650,9 @@ impl<T: std::fmt::Debug> NFA<T> {
         let suggestions = self.suggest_impl(suggestion_states);
         (output, suggestions)
     }
-}
 
-impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
-    fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)> {
+    #[cfg(test)]
+    pub fn parse_for_tests<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)> {
         self.parse_impl(input)
             .0
             .into_iter()
