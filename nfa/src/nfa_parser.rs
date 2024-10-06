@@ -529,7 +529,7 @@ impl<T: std::fmt::Debug> NFA<T> {
             .collect()
     }
 
-    fn suggest<'a>(
+    fn suggest_impl<'a>(
         &'a self,
         mut suggestion_states: VecDeque<BFSSuggestions<'a, T>>,
     ) -> Vec<Suggestion<'a, T>> {
@@ -561,11 +561,14 @@ impl<T: std::fmt::Debug> NFA<T> {
         suggestions
     }
 
-    pub fn parse_full_and_suggest<'a>(
+    #[allow(clippy::type_complexity)]
+    fn parse_impl<'a, 'b>(
         &'a self,
-        input: &str,
-    ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
-        // TODO: collect payloads
+        input: &'b str,
+    ) -> (
+        Vec<(&'a T, &'b str, f64, Vec<Trace<&'a T>>)>,
+        VecDeque<BFSSuggestions<T>>,
+    ) {
         let mut state = VecDeque::from([ParseState {
             node: &self.nodes[self.root],
             unparsed_string: input,
@@ -616,6 +619,15 @@ impl<T: std::fmt::Debug> NFA<T> {
                 },
             ));
         }
+        (output, suggestion_states)
+    }
+
+    pub fn parse_full_and_suggest<'a>(
+        &'a self,
+        input: &str,
+    ) -> (Vec<Parsed<'a, T>>, Vec<Suggestion<'a, T>>) {
+        // TODO: collect payloads
+        let (output, suggestion_states) = self.parse_impl(input);
 
         let mut output: Vec<_> = output
             .into_iter()
@@ -637,31 +649,18 @@ impl<T: std::fmt::Debug> NFA<T> {
                 .unwrap_or(Ordering::Greater)
                 .reverse()
         });
-        let suggestions = self.suggest(suggestion_states);
+        let suggestions = self.suggest_impl(suggestion_states);
         (output, suggestions)
     }
 }
 
 impl<T: std::fmt::Debug> Parser<T> for NFA<T> {
     fn parse<'a, 'b>(&'a self, input: &'b str) -> Vec<(&'a T, &'b str)> {
-        // TODO: collect payloads
-        let mut state = VecDeque::from([(&self.nodes[self.root], input)]);
-        let mut output = vec![];
-        while let Some((node, string)) = state.pop_front() {
-            if node.is_final {
-                if let Some(ref payload) = node.payload {
-                    output.push((payload, string));
-                } else {
-                    // TODO: what is it's missing, or have value and not final...
-                }
-            }
-            state.extend(
-                self.node_parse(node, string)
-                    .into_iter()
-                    .map(|(a, b, _c, _d)| (a, b)),
-            );
-        }
-        output
+        self.parse_impl(input)
+            .0
+            .into_iter()
+            .map(|x| (x.0, x.1))
+            .collect()
     }
 }
 
