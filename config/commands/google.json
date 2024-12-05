@@ -21,7 +21,7 @@
   },
   "redirects": [
     {
-      "query": "google {query:query}",
+      "query": "search google {query:query}",
       "link": "https://www.google.com/search?q={query}"
     },
     {
