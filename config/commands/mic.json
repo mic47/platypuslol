@@ -26,7 +26,7 @@
       "link": "https://www.obi.sk/search/{query}/"
     },
     {
-      "query": "search ornbach {query:query}",
+      "query": "search {hornbach:prefix:2} {query:query}",
       "link": "https://www.hornbach.sk/s/{query}/"
     },
     {

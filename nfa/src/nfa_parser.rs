@@ -366,10 +366,10 @@ impl NFA<()> {
         NFA { nodes, root: 0 }
     }
 
-    pub fn match_non_empty_prefixes(input: &str) -> NFA<()> {
+    pub fn match_non_empty_prefixes(input: &str, min_length: usize) -> NFA<()> {
         let nodes = vec![
             Node::default().with_normal_edges(
-                &((1..input.len() + 1)
+                &((1.max(min_length)..input.len() + 1)
                     .map(|len| (&input[0..len], 1))
                     .collect::<Vec<_>>()),
             ),

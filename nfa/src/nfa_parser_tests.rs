@@ -11,7 +11,7 @@ fn test_match_string() {
 
 #[test]
 fn test_non_empty_prefixes() {
-    let parser = NFA::match_non_empty_prefixes("foo").with_payload_for_final_nodes(&());
+    let parser = NFA::match_non_empty_prefixes("foo", 1).with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
     assert_eq!(parser.parse_for_tests("f"), vec![(&(), "")],);
     assert_eq!(parser.parse_full_for_tests("foo"), vec![&()]);
@@ -27,8 +27,8 @@ fn test_non_empty_prefixes() {
 #[test]
 fn test_chain_2_elements() {
     let parser = NFA::chain(&[
-        NFA::match_non_empty_prefixes("foo"),
-        NFA::match_non_empty_prefixes("bar"),
+        NFA::match_non_empty_prefixes("foo", 1),
+        NFA::match_non_empty_prefixes("bar", 1),
     ])
     .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
@@ -45,9 +45,9 @@ fn test_chain_2_elements() {
 #[test]
 fn test_chain_3_elements_with_non_zero_space() {
     let parser = NFA::chain(&[
-        NFA::match_non_empty_prefixes("foo"),
+        NFA::match_non_empty_prefixes("foo", 1),
         NFA::match_one_or_more_spaces(),
-        NFA::match_non_empty_prefixes("bar"),
+        NFA::match_non_empty_prefixes("bar", 1),
     ])
     .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
@@ -67,9 +67,9 @@ fn test_chain_3_elements_with_non_zero_space() {
 #[test]
 fn test_chain_3_elements_with_zero_space() {
     let parser = NFA::chain(&[
-        NFA::match_non_empty_prefixes("foo"),
+        NFA::match_non_empty_prefixes("foo", 1),
         NFA::match_zero_or_more_spaces(),
-        NFA::match_non_empty_prefixes("bar"),
+        NFA::match_non_empty_prefixes("bar", 1),
     ])
     .with_payload_for_final_nodes(&());
     let empty: Vec<&()> = vec![];
@@ -89,8 +89,8 @@ fn test_chain_3_elements_with_zero_space() {
 #[test]
 fn test_any_of() {
     let parser = NFA::any_of(&[
-        NFA::match_non_empty_prefixes("foo"),
-        NFA::match_non_empty_prefixes("feee"),
+        NFA::match_non_empty_prefixes("foo", 1),
+        NFA::match_non_empty_prefixes("feee", 1),
         NFA::match_string("bar"),
     ])
     .with_payload_for_final_nodes(&());

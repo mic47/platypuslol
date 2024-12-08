@@ -88,6 +88,7 @@ pub enum QueryToken {
     Exact(String),
     Prefix {
         word: String,
+        min_length: usize,
     },
     Regex(String, Regex),
     Substitution {
@@ -124,7 +125,10 @@ impl QueryToken {
     ) -> String {
         match self {
             QueryToken::Exact(data) => data.clone(),
-            QueryToken::Prefix { word } => word.clone(),
+            QueryToken::Prefix {
+                word,
+                min_length: _,
+            } => word.clone(),
             QueryToken::Regex(replacement, _) => {
                 if let Some(replacement) = matches.get(replacement) {
                     // TODO: we want to html escape this in better way. Probably in javascript
@@ -162,9 +166,9 @@ impl Ord for QueryToken {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (self, other) {
             (QueryToken::Exact(left), QueryToken::Exact(right))
-            | (QueryToken::Exact(left), QueryToken::Prefix { word: right })
-            | (QueryToken::Prefix { word: left }, QueryToken::Exact(right))
-            | (QueryToken::Prefix { word: left }, QueryToken::Prefix { word: right }) => {
+            | (QueryToken::Exact(left), QueryToken::Prefix { word: right, .. })
+            | (QueryToken::Prefix { word: left, .. }, QueryToken::Exact(right))
+            | (QueryToken::Prefix { word: left, .. }, QueryToken::Prefix { word: right, .. }) => {
                 let result = left.cmp(right);
                 match result {
                     std::cmp::Ordering::Equal => match (self, other) {
@@ -209,7 +213,22 @@ impl QueryToken {
             [item, "exact"] => Self::Exact((*item).into()),
             [item, "prefix"] => Self::Prefix {
                 word: (*item).into(),
+                min_length: 1,
             },
+            [item, "prefix", min_length_str] => {
+                if let Ok(min_length) = min_length_str.parse::<usize>() {
+                    Self::Prefix {
+                        word: (*item).into(),
+                        min_length,
+                    }
+                } else {
+                    Err(anyhow::anyhow!(
+                        "could not parse min length for '{}' for prefix {}",
+                        min_length_str,
+                        item
+                    ))?
+                }
+            }
             [item, "word"] => Self::Regex((*item).into(), Regex::new(r"\w+")?),
             [item] | [item, "query"] => Self::Regex((*item).into(), Regex::new(r".+")?),
             [item, "subst", type_, subtype] => Self::Substitution {
@@ -257,7 +276,10 @@ pub fn parse_query(input: &str, exact: bool) -> anyhow::Result<Vec<QueryToken>> 
                 let constructor = if exact {
                     QueryToken::Exact
                 } else {
-                    |word| QueryToken::Prefix { word }
+                    |word| QueryToken::Prefix {
+                        word,
+                        min_length: 1,
+                    }
                 };
                 item.split_whitespace()
                     .map(|x| Ok(constructor(x.into())))
