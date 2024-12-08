@@ -23,11 +23,11 @@
     },
     {
       "query": "search obi {query:query}",
-      "link": "https://www.obi.sk/search/{query}/"
+      "link": "https://www.obi.sk/search/{query:|AsIs}/"
     },
     {
       "query": "search {hornbach:prefix:2} {query:query}",
-      "link": "https://www.hornbach.sk/s/{query}/"
+      "link": "https://www.hornbach.sk/s/{query:|AsIs}/"
     },
     {
       "query": "search unicode {query:query}",
