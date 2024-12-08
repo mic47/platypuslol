@@ -835,6 +835,14 @@ fn config_form(section: &mut Node, params: &HashMap<String, String>) -> anyhow::
     )?;
     writeln!(
         list.li(),
+        "{{name:prefix}} -- match any prefix of the word."
+    )?;
+    writeln!(
+        list.li(),
+        "{{name:prefix:min_length}} -- match any prefix of the word that has length at least `{{min_length}}`."
+    )?;
+    writeln!(
+        list.li(),
         "{{name:word}} -- match single word. You can use matched word in the link using '{{name}}'"
     )?;
     writeln!(list.li(), "{{name:query}} -- match any string, including white spaces. You can use matched string in the link using '{{name}}'")?;
