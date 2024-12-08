@@ -633,7 +633,7 @@ impl<T: std::fmt::Debug> NFA<T> {
         input: &'b str,
     ) -> (
         Vec<(&'a T, &'b str, f64, List<Trace<&'a T>>)>,
-        VecDeque<BFSSuggestions<T>>,
+        VecDeque<BFSSuggestions<'a, T>>,
     ) {
         let mut state = VecDeque::from([ParseState {
             node: &self.nodes[self.root],
