@@ -843,9 +843,9 @@ fn config_form(section: &mut Node, params: &HashMap<String, String>) -> anyhow::
     )?;
     writeln!(
         list.li(),
-        "{{name:word}} -- match single word. You can use matched word in the link using '{{name}}'"
+        "{{name:word}} -- match single word. You can use matched word in the link using '{{name}}'. You can use '{{name:|list-of-transformations}}' to transform query in the final url. 'list-of-transformations' is '|' separated list of 'URLEncode', 'AsIs', 'Uppercase', or 'LowerCase'. Note that it has to start with '|' character."
     )?;
-    writeln!(list.li(), "{{name:query}} -- match any string, including white spaces. You can use matched string in the link using '{{name}}'")?;
+    writeln!(list.li(), "{{name:query}} -- match any string, including white spaces. You can use matched string in the link using '{{name}}'. You can use `list-of-transformations` with query too.")?;
     writeln!(list.li(), "{{name:subst:type:K1}} -- match key 'K1' string from substitution of 'type'. In case 'name' is empty, 'type' is used as 'name'. You can use '{{name:K2}}' in the link to substitute to key 'K2' from matched substitution. Substitution is matched if it's a substring. For example 'ol' matches 'rofl', but 'lo' does not.")?;
 
     Ok(())
