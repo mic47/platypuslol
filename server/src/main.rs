@@ -37,6 +37,7 @@ lazy_static::lazy_static! {
         ("commands/google.json".into(), include_str!("../../config/commands/google.json")),
         ("commands/python.json".into(), include_str!("../../config/commands/python.json")),
         ("commands/github.json".into(), include_str!("../../config/commands/github.json")),
+        ("commands/mic.json".into(), include_str!("../../config/commands/mic.json")),
     ]);
 }
 const LIST_JS: &str = include_str!("../../resources/keypress.js");

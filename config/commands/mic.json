@@ -1,0 +1,37 @@
+{
+  "substitutions": {},
+  "redirects": [
+    {
+      "query": "search amazon {query:query}",
+      "link": "https://www.amazon.de/s?k={query}"
+    },
+    {
+      "query": "search bazos {query:query}",
+      "link": "https://www.bazos.sk/search.php?hledat={query}"
+    },
+    {
+      "query": "search muziker {query:query}",
+      "link": "https://www.muziker.sk/search?q={query}"
+    },
+    {
+      "query": "search duckduckgo {query:query}",
+      "link": "https://duckduckgo.com/?q={query}"
+    },
+    {
+      "query": "search images {query:query}",
+      "link": "https://duckduckgo.com/?t=h_&q={query}&iax=images&ia=images"
+    },
+    {
+      "query": "search obi {query:query}",
+      "link": "https://www.obi.sk/search/{query}/"
+    },
+    {
+      "query": "search ornbach {query:query}",
+      "link": "https://www.hornbach.sk/s/{query}/"
+    },
+    {
+      "query": "search unicode {query:query}",
+      "link": "https://unicode.party/?query={query}/"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "fallback": {
     "link": "https://www.google.com/search?q={query}",
-    "query_prefix": "google",
+    "query_prefix": "search google",
     "redirect_automatically": true
   },
   "external_configurations": {
@@ -13,6 +13,9 @@
     },
     "builtin://commands/github.json": {
       "enabled": true
+    },
+    "builtin://commands/mic.json": {
+      "enabled": false
     }
   },
   "substitutions": {},
