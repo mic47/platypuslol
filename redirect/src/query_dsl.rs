@@ -86,7 +86,9 @@ fn parse_braces(input: &str) -> Option<Vec<&str>> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum QueryToken {
     Exact(String),
-    Prefix(String),
+    Prefix {
+        word: String,
+    },
     Regex(String, Regex),
     Substitution {
         name: String,
@@ -122,7 +124,7 @@ impl QueryToken {
     ) -> String {
         match self {
             QueryToken::Exact(data) => data.clone(),
-            QueryToken::Prefix(data) => data.clone(),
+            QueryToken::Prefix { word } => word.clone(),
             QueryToken::Regex(replacement, _) => {
                 if let Some(replacement) = matches.get(replacement) {
                     // TODO: we want to html escape this in better way. Probably in javascript
@@ -160,16 +162,16 @@ impl Ord for QueryToken {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (self, other) {
             (QueryToken::Exact(left), QueryToken::Exact(right))
-            | (QueryToken::Exact(left), QueryToken::Prefix(right))
-            | (QueryToken::Prefix(left), QueryToken::Exact(right))
-            | (QueryToken::Prefix(left), QueryToken::Prefix(right)) => {
+            | (QueryToken::Exact(left), QueryToken::Prefix { word: right })
+            | (QueryToken::Prefix { word: left }, QueryToken::Exact(right))
+            | (QueryToken::Prefix { word: left }, QueryToken::Prefix { word: right }) => {
                 let result = left.cmp(right);
                 match result {
                     std::cmp::Ordering::Equal => match (self, other) {
                         (QueryToken::Exact(_), QueryToken::Exact(_)) => result,
-                        (QueryToken::Prefix(_), QueryToken::Prefix(_)) => result,
-                        (QueryToken::Exact(_), QueryToken::Prefix(_)) => Ordering::Less,
-                        (QueryToken::Prefix(_), QueryToken::Exact(_)) => Ordering::Greater,
+                        (QueryToken::Prefix { .. }, QueryToken::Prefix { .. }) => result,
+                        (QueryToken::Exact(_), QueryToken::Prefix { .. }) => Ordering::Less,
+                        (QueryToken::Prefix { .. }, QueryToken::Exact(_)) => Ordering::Greater,
                         _ => unreachable!(),
                     },
                     _ => result,
@@ -192,8 +194,8 @@ impl Ord for QueryToken {
             ) => (la, lb, lc).cmp(&(ra, rb, rc)),
             (QueryToken::Exact(_), _) => Ordering::Less,
             (_, QueryToken::Exact(_)) => Ordering::Greater,
-            (QueryToken::Prefix(_), _) => Ordering::Less,
-            (_, QueryToken::Prefix(_)) => Ordering::Greater,
+            (QueryToken::Prefix { .. }, _) => Ordering::Less,
+            (_, QueryToken::Prefix { .. }) => Ordering::Greater,
             (QueryToken::Regex(_, _), _) => Ordering::Less,
             (_, QueryToken::Regex(_, _)) => Ordering::Greater,
         }
@@ -205,7 +207,9 @@ impl QueryToken {
         Ok(match tokens {
             [] | [""] => Err(anyhow::anyhow!("empty brace parameters"))?,
             [item, "exact"] => Self::Exact((*item).into()),
-            [item, "prefix"] => Self::Prefix((*item).into()),
+            [item, "prefix"] => Self::Prefix {
+                word: (*item).into(),
+            },
             [item, "word"] => Self::Regex((*item).into(), Regex::new(r"\w+")?),
             [item] | [item, "query"] => Self::Regex((*item).into(), Regex::new(r".+")?),
             [item, "subst", type_, subtype] => Self::Substitution {
@@ -253,7 +257,7 @@ pub fn parse_query(input: &str, exact: bool) -> anyhow::Result<Vec<QueryToken>> 
                 let constructor = if exact {
                     QueryToken::Exact
                 } else {
-                    QueryToken::Prefix
+                    |word| QueryToken::Prefix { word }
                 };
                 item.split_whitespace()
                     .map(|x| Ok(constructor(x.into())))
@@ -289,7 +293,7 @@ pub fn validate_query_and_link_with_substitutions(
     for token in query {
         match token {
             QueryToken::Exact(_) => {}
-            QueryToken::Prefix(_) => {}
+            QueryToken::Prefix { .. } => {}
             QueryToken::Regex(_, _) => {}
             QueryToken::Substitution {
                 name,

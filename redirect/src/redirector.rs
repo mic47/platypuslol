@@ -80,15 +80,15 @@ pub fn create_parser(
                                 QueryToken::Regex(_, _) | QueryToken::Substitution { .. } => {
                                     parsers.push(NFA::match_one_or_more_spaces())
                                 }
-                                QueryToken::Exact(_) | QueryToken::Prefix(_) => {
+                                QueryToken::Exact(_) | QueryToken::Prefix { .. } => {
                                     parsers.push(NFA::match_one_or_more_spaces())
                                 }
                             },
-                            QueryToken::Exact(_) | QueryToken::Prefix(_) => match prev {
+                            QueryToken::Exact(_) | QueryToken::Prefix { .. } => match prev {
                                 QueryToken::Regex(_, _) | QueryToken::Substitution { .. } => {
                                     parsers.push(NFA::match_one_or_more_spaces());
                                 }
-                                QueryToken::Exact(_) | QueryToken::Prefix(_) => {
+                                QueryToken::Exact(_) | QueryToken::Prefix { .. } => {
                                     parsers.push(NFA::match_zero_or_more_spaces())
                                 }
                             },
@@ -96,7 +96,7 @@ pub fn create_parser(
                     }
                     parsers.push(match word {
                         QueryToken::Exact(ref word) => NFA::match_string(word),
-                        QueryToken::Prefix(ref word) => NFA::match_non_empty_prefixes(word),
+                        QueryToken::Prefix { ref word } => NFA::match_non_empty_prefixes(word),
                         QueryToken::Regex(ref identifier, ref regex) => {
                             NFA::regex(identifier.clone(), regex.clone())
                         }
