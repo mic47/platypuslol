@@ -821,10 +821,10 @@ fn config_form(section: &mut Node, params: &HashMap<String, String>) -> anyhow::
     form.br();
     writeln!(form, "You can test above existing or new query commands. If new command is valid, this tool will show you snippet that you can put into documentation.")?;
     let mut list = form.ul();
-    writeln!(list.li(), "Test query -- what you put")?;
+    writeln!(list.li(), "Test query -- what you type into browser.")?;
     writeln!(
         list.li(),
-        "Query -- query part of the command. What you type into browser."
+        "Query -- query part of the command -- what is matched agains what you type into browser."
     )?;
     writeln!(list.li(), "Links -- one link per line.")?;
     writeln!(form, "Inside query and links, you can use following substitution variables, all inside braces '{{}}':")?;
