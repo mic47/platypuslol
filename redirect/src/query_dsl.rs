@@ -246,20 +246,61 @@ impl QueryToken {
 }
 
 #[derive(Clone, Debug)]
+pub enum UserInputPostprocessStep {
+    URLEncode,
+    AsIs,
+    UpperCase,
+    LowerCase,
+}
+impl UserInputPostprocessStep {
+    fn new(input: &str) -> anyhow::Result<Self> {
+        match input.to_lowercase().as_str() {
+            "urlencode" => Ok(UserInputPostprocessStep::URLEncode),
+            "asis" => Ok(UserInputPostprocessStep::AsIs),
+            "uppercase" => Ok(UserInputPostprocessStep::UpperCase),
+            "lowercase" => Ok(UserInputPostprocessStep::LowerCase),
+            _ => Err(anyhow::anyhow!("Unknown prostprocess step '{}'.", input)),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum LinkToken {
     Exact(String),
-    Replacement(String),
-    Substitution { name: String, subtype: String },
+    Replacement {
+        name: String,
+        post_process: Vec<UserInputPostprocessStep>,
+    },
+    Substitution {
+        name: String,
+        subtype: String,
+    },
 }
 impl LinkToken {
     fn new(tokens: &[&str]) -> anyhow::Result<Self> {
         Ok(match tokens {
             [] | [""] => Err(anyhow::anyhow!("empty brace parameters"))?,
-            [item] => Self::Replacement((*item).into()),
-            [name, subtype] => Self::Substitution {
-                name: (*name).into(),
-                subtype: (*subtype).into(),
+            [item] => Self::Replacement {
+                name: (*item).into(),
+                post_process: vec![UserInputPostprocessStep::URLEncode],
             },
+            [name, subtype_or_postprocess] => {
+                if subtype_or_postprocess.starts_with('|') {
+                    Self::Replacement {
+                        name: (*name).into(),
+                        post_process: subtype_or_postprocess
+                            .split('|')
+                            .filter(|x| !x.is_empty())
+                            .map(UserInputPostprocessStep::new)
+                            .collect::<Result<_, _>>()?,
+                    }
+                } else {
+                    Self::Substitution {
+                        name: (*name).into(),
+                        subtype: (*subtype_or_postprocess).into(),
+                    }
+                }
+            }
             x => Err(anyhow::anyhow!("unable to parse brace expression {:?}", x))?,
         })
     }
@@ -347,7 +388,7 @@ pub fn validate_query_and_link_with_substitutions(
     for token in link {
         match token {
             LinkToken::Exact(_) => {}
-            LinkToken::Replacement(_) => {}
+            LinkToken::Replacement { .. } => {}
             LinkToken::Substitution { name, subtype } => {
                 let type_ = name_to_type.get(name).ok_or_else(|| anyhow::anyhow!(
                     "There is no substitution named '{}' in the query. Existing substitutions are {:?}",
@@ -387,7 +428,10 @@ pub fn validate_query_with_link(
     let link_replacement_types = link
         .iter()
         .filter_map(|x| match x {
-            LinkToken::Replacement(data) => Some(data),
+            LinkToken::Replacement {
+                name,
+                post_process: _,
+            } => Some(name),
             _ => None,
         })
         .collect::<HashSet<_>>();

@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::{
     parse_link, parse_query, validate_query_and_link_with_substitutions, validate_query_with_link,
-    LinkToken, QueryToken,
+    LinkToken, QueryToken, UserInputPostprocessStep,
 };
 use nfa::{EdgeData, Parsed, Suggestion, Trace, NFA};
 
@@ -216,11 +216,26 @@ fn process_query(
             .map(|x| {
                 Some(match x {
                     LinkToken::Exact(data) => data.clone(),
-                    LinkToken::Replacement(replacement) => {
-                        if let Some(replacement) = matches.get(replacement) {
-                            // TODO: we want to html escape this in better way. Probably in javascript
-                            // even?
-                            replacement.clone().replace(' ', "+")
+                    LinkToken::Replacement { name, post_process } => {
+                        if let Some(replacement) = matches.get(name) {
+                            let mut replacement = replacement.clone();
+                            post_process.iter().for_each(|post_process| {
+                                match post_process {
+                                    // TODO: we want to html escape this in better way. Probably in javascript
+                                    // even?
+                                    UserInputPostprocessStep::URLEncode => {
+                                        replacement = replacement.replace(' ', "+");
+                                    }
+                                    UserInputPostprocessStep::AsIs => {}
+                                    UserInputPostprocessStep::UpperCase => {
+                                        replacement = replacement.to_uppercase();
+                                    }
+                                    UserInputPostprocessStep::LowerCase => {
+                                        replacement = replacement.to_lowercase();
+                                    }
+                                };
+                            });
+                            replacement
                         } else {
                             // If we cannot produce the link, let's not return the link
                             default_replacement.clone()?
