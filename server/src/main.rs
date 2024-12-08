@@ -319,7 +319,7 @@ fn list_nest<I: Iterator<Item = (String, String)>>(
                     .into_iter()
                     .map(|x| match x {
                         redirect::QueryToken::Exact(x) => x,
-                        redirect::QueryToken::Prefix(x) => x,
+                        redirect::QueryToken::Prefix { word } => word,
                         redirect::QueryToken::Regex(x, _) => x,
                         redirect::QueryToken::Substitution {
                             name,
