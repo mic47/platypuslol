@@ -13,7 +13,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use itertools::Itertools;
 use nfa::{Parsed, Suggestion};
-use notify::{Event, INotifyWatcher, RecursiveMode, Watcher};
+use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 
 use redirect::{
     resolve_parsed_output, resolve_suggestion_output, CommonAppState, Config, ConfigLinkQuery,
@@ -1316,7 +1316,7 @@ fn config_watcher(
     path: PathBuf,
     state: Arc<RwLock<Arc<CommonAppState>>>,
     last_parsing_error: Arc<RwLock<LastParsingError>>,
-) -> anyhow::Result<INotifyWatcher> {
+) -> anyhow::Result<RecommendedWatcher> {
     let watcher_path = path.clone();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
         let path = watcher_path.clone();
