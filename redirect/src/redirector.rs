@@ -96,7 +96,10 @@ pub fn create_parser(
                     }
                     parsers.push(match word {
                         QueryToken::Exact(ref word) => NFA::match_string(word),
-                        QueryToken::Prefix { ref word } => NFA::match_non_empty_prefixes(word),
+                        QueryToken::Prefix {
+                            ref word,
+                            min_length,
+                        } => NFA::match_non_empty_prefixes(word, *min_length),
                         QueryToken::Regex(ref identifier, ref regex) => {
                             NFA::regex(identifier.clone(), regex.clone())
                         }
