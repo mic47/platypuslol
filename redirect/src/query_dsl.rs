@@ -205,6 +205,7 @@ impl QueryToken {
         Ok(match tokens {
             [] | [""] => Err(anyhow::anyhow!("empty brace parameters"))?,
             [item, "exact"] => Self::Exact((*item).into()),
+            [item, "prefix"] => Self::Prefix((*item).into()),
             [item, "word"] => Self::Regex((*item).into(), Regex::new(r"\w+")?),
             [item] | [item, "query"] => Self::Regex((*item).into(), Regex::new(r".+")?),
             [item, "subst", type_, subtype] => Self::Substitution {
