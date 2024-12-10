@@ -13,9 +13,6 @@
     },
     "builtin://commands/github.json": {
       "enabled": true
-    },
-    "builtin://commands/mic.json": {
-      "enabled": false
     }
   },
   "substitutions": {},
