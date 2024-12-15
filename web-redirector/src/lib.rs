@@ -6,6 +6,28 @@ use std::{
 use anyhow::Context;
 use redirect::{resolve_parsed_output, resolve_suggestion_output, CommonAppState};
 
+pub fn debug(
+    request_params: &HashMap<String, String>,
+    state: Arc<CommonAppState>,
+) -> anyhow::Result<Option<serde_json::Value>> {
+    if let Some(query) = request_params.get("q") {
+        let (parsed, suggested) = state.parser.parse_full_and_suggest(query);
+        let parsed: Vec<_> = parsed
+            .into_iter()
+            .map(|x| resolve_parsed_output(x, &None).0)
+            .collect();
+        let suggested: Vec<_> = suggested
+            .into_iter()
+            .map(|x| resolve_suggestion_output(x, &None).0)
+            .collect();
+        Ok(Some(
+            serde_json::to_value((parsed, suggested)).context("Unable to serialize to json")?,
+        ))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn suggest(
     query_params: &HashMap<String, String>,
     state: Arc<CommonAppState>,
