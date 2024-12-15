@@ -1,0 +1,20 @@
+[package]
+name = "web-redirector"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "web_redirector"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+anyhow.workspace = true
+futures-util.workspace = true
+html-builder.workspace = true
+nfa.workspace = true
+redirect.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+lazy_static.workspace = true
+itertools = "0.13.0"
