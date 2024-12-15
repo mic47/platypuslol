@@ -14,7 +14,6 @@ pub struct RedirectConfig<T> {
 pub enum ConfigUrl {
     Builtin { path: String },
     Local { path: String },
-    Remote { url: String },
 }
 
 impl<'de> Deserialize<'de> for ConfigUrl {
@@ -28,7 +27,7 @@ impl<'de> Deserialize<'de> for ConfigUrl {
         } else if let Some(path) = url.strip_prefix("local://") {
             ConfigUrl::Local { path: path.into() }
         } else {
-            ConfigUrl::Remote { url: url.into() }
+            ConfigUrl::Local { path: url.into() }
         })
     }
 }
@@ -41,7 +40,6 @@ impl Serialize for ConfigUrl {
         match self {
             ConfigUrl::Builtin { path } => serializer.serialize_str(&format!("builtin://{path}")),
             ConfigUrl::Local { path } => serializer.serialize_str(&format!("local://{path}")),
-            ConfigUrl::Remote { url } => serializer.serialize_str(url),
         }
     }
 }
