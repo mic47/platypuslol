@@ -65,8 +65,9 @@ pub fn route_get(
     path: &str,
     request_params: HashMap<String, String>,
     last_parsing_error: LastParsingError,
-    template_variables: HashMap<String, String>,
+    server_uri: String,
 ) -> anyhow::Result<ServerResponse> {
+    let template_variables = HashMap::from([("{server}".into(), server_uri)]);
     match path {
         "" | "/install" => Ok(ServerResponse::Html(templated_string(
             INSTALL_INSTRUCTIONS.into(),
