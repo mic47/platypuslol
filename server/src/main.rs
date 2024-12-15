@@ -21,7 +21,7 @@ use redirect::{
     ResolvedOutputMetadata, ResolvedSuggestionOutput,
 };
 use tokio::runtime::Runtime;
-use web_redirector::suggest;
+use web_redirector::{debug, suggest};
 
 const INSTALL_INSTRUCTIONS: &str = include_str!("../../resources/index.html");
 const OPENSEARCH: &str = include_str!("../../resources/opensearch.xml");
@@ -51,26 +51,6 @@ struct Cli {
 
     #[arg(short, long, value_name = "PORT", default_value = "3047")]
     pub port: u16,
-}
-
-fn debug(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Response<Body>> {
-    let p = query_params(&req);
-    if let Some(query) = p.get("q") {
-        let (parsed, suggested) = state.parser.parse_full_and_suggest(query);
-        let parsed: Vec<_> = parsed
-            .into_iter()
-            .map(|x| resolve_parsed_output(x, &None).0)
-            .collect();
-        let suggested: Vec<_> = suggested
-            .into_iter()
-            .map(|x| resolve_suggestion_output(x, &None).0)
-            .collect();
-        return to_string_response(
-            serde_json::to_value((parsed, suggested)).context("Unable to serialize to json")?,
-            ContentType::Json,
-        );
-    }
-    Ok(not_found())
 }
 
 fn query_params(req: &Request<Body>) -> HashMap<String, String> {
@@ -1014,7 +994,13 @@ fn route(
         ),
         (&Method::GET, "/list") => list(req, state, last_parsing_error, None),
         (&Method::GET, "/config") => config(req, state, last_parsing_error),
-        (&Method::GET, "/debug") => debug(req, state),
+        (&Method::GET, "/debug") => debug(&req_query_params, state).and_then(|maybe_json| {
+            if let Some(json) = maybe_json {
+                to_string_response(json, ContentType::Json)
+            } else {
+                Ok(not_found())
+            }
+        }),
         (&Method::GET, "/redirect") => redirect(req, state, last_parsing_error),
         (&Method::GET, "/suggest") => suggest(&req_query_params, state).and_then(|maybe_json| {
             if let Some(json) = maybe_json {
