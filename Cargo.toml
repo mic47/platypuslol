@@ -30,4 +30,4 @@ serde_json = "1.0.133"
 serde = { version = "1.0.215" , features = ["derive"] }
 serde_path_to_error = "0.1.11"
 tokio = { version = "1.42.0", features = ["full"]}
-url = "2.5.2"
+url = "2.5.4"
