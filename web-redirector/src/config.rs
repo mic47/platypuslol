@@ -14,7 +14,7 @@ lazy_static::lazy_static! {
     ]);
 }
 
-pub fn load_config<F: Fn(&Path) -> std::io::Result<String>>(
+pub fn load_config<F: Fn(&Path) -> anyhow::Result<String>>(
     config_path: &Path,
     read_to_string: F,
 ) -> anyhow::Result<Arc<CommonAppState>> {
@@ -23,7 +23,7 @@ pub fn load_config<F: Fn(&Path) -> std::io::Result<String>>(
         .map(Arc::new)
 }
 
-fn load_fetch_and_parse_configs<F: Fn(&Path) -> std::io::Result<String>>(
+fn load_fetch_and_parse_configs<F: Fn(&Path) -> anyhow::Result<String>>(
     config_path: &Path,
     read_to_string: F,
 ) -> anyhow::Result<Config<String, RedirectConfig<String>>> {
