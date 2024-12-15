@@ -145,7 +145,8 @@ fn config_watcher(
                 {
                     Runtime::new()
                         .map(|_| {
-                            let new_parser = load_config(&path, |x| std::fs::read_to_string(x));
+                            let new_parser =
+                                load_config(&path, |x| Ok(std::fs::read_to_string(x)?));
                             match new_parser {
                                 Ok(new_parser) => {
                                     let mut parser = state.write().unwrap();
@@ -186,7 +187,7 @@ async fn main() -> anyhow::Result<()> {
     eprintln!("Starting with following parameters {:#?}", cli);
 
     let parser = Arc::new(RwLock::new(load_config(&cli.link_config, |x| {
-        std::fs::read_to_string(x)
+        Ok(std::fs::read_to_string(x)?)
     })?));
     let last_parsing_error = Arc::new(RwLock::new(Arc::new(None)));
 
