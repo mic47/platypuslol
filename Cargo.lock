@@ -869,6 +869,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "url",
+ "web-redirector",
 ]
 
 [[package]]
