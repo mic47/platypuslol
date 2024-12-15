@@ -49,7 +49,7 @@ fn route(
     req: Request<Body>,
     state: Arc<RwLock<Arc<CommonAppState>>>,
     last_parsing_error: Arc<RwLock<LastParsingError>>,
-    template_variables: HashMap<String, String>,
+    server_uri: String,
 ) -> Result<Response<Body>, Infallible> {
     let method = req.method();
     let path = req.uri().path();
@@ -63,7 +63,7 @@ fn route(
             path,
             req_query_params,
             last_parsing_error,
-            template_variables,
+            server_uri,
         )
         .and_then(|x| match x {
             ServerResponse::NotFound => Ok(not_found()),
@@ -352,8 +352,7 @@ async fn main() -> anyhow::Result<()> {
                         .and_then(|x| x.to_str().ok())
                         .unwrap_or(&default_server)
                 );
-                let template_variables = HashMap::from([("{server}".into(), server_uri)]);
-                async { route(req, parser, last_parsing_error, template_variables) }
+                async { route(req, parser, last_parsing_error, server_uri) }
             }))
         }
     });
