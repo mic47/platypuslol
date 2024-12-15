@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
 use anyhow::Context;
-use hyper::body::Buf;
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
@@ -139,7 +138,7 @@ fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
     Response::from_parts(parts, body)
 }
 
-async fn load_fetch_and_parse_configs(
+fn load_fetch_and_parse_configs(
     config_path: &Path,
 ) -> anyhow::Result<Config<String, RedirectConfig<String>>> {
     // TODO: make sure error messages have line numbers / serde path
@@ -156,72 +155,64 @@ async fn load_fetch_and_parse_configs(
         .context("Unable to parse config.")?,
     )
     .map_err(anyhow::Error::msg)?;
-    let external_configurations: anyhow::Result<HashMap<_, _>> = futures_util::future::join_all(
-        external_configurations
-            .into_iter()
-            .chain([(
-                ConfigUrl::Builtin {
-                    path: "commands/base.json".into(),
-                },
-                ExternalParser::<()> {
-                    enabled: true,
-                    substitutions_to_inherit: vec![],
-                    prefix: None,
-                    config: None,
-                },
-            )])
-            .map(|(url, redirect_config)| async move {
-                let config = if redirect_config.enabled {
-                    match url.clone() {
-                        ConfigUrl::Builtin { path } => {
-                            let ret: RedirectConfig<String> = RedirectConfig::from_config_file(
-                                serde_json::from_str(BUILTIN_PARSERS.get(&path).with_context(
-                                    || format!("Unable to find builtin config {path}"),
-                                )?)
-                                .with_context(|| {
-                                    format!("Unable to parse builtin config {path}")
-                                })?,
-                            )
-                            .map_err(anyhow::Error::msg)?;
-                            Some(ret)
-                        }
-                        ConfigUrl::Local { path } => {
-                            let parent = config_path.parent().unwrap_or(config_path);
-                            let content = std::fs::read_to_string(parent.join(&path))
-                                .with_context(|| {
-                                    format!("Unable to find config file {:?}", path)
-                                })?;
-                            let config: RedirectConfig<String> = RedirectConfig::from_config_file(
-                                serde_json::from_str(&content)
-                                    .with_context(|| format!("Unable to parse config {path}"))?,
-                            )
-                            .map_err(anyhow::Error::msg)?;
-                            Some(config)
-                        }
+    let external_configurations: anyhow::Result<HashMap<_, _>> = external_configurations
+        .into_iter()
+        .chain([(
+            ConfigUrl::Builtin {
+                path: "commands/base.json".into(),
+            },
+            ExternalParser::<()> {
+                enabled: true,
+                substitutions_to_inherit: vec![],
+                prefix: None,
+                config: None,
+            },
+        )])
+        .map(|(url, redirect_config)| {
+            let config = if redirect_config.enabled {
+                match url.clone() {
+                    ConfigUrl::Builtin { path } => {
+                        let ret: RedirectConfig<String> = RedirectConfig::from_config_file(
+                            serde_json::from_str(BUILTIN_PARSERS.get(&path).with_context(
+                                || format!("Unable to find builtin config {path}"),
+                            )?)
+                            .with_context(|| format!("Unable to parse builtin config {path}"))?,
+                        )
+                        .map_err(anyhow::Error::msg)?;
+                        Some(ret)
                     }
-                } else {
-                    None
-                };
-                let ExternalParser {
+                    ConfigUrl::Local { path } => {
+                        let parent = config_path.parent().unwrap_or(config_path);
+                        let content = std::fs::read_to_string(parent.join(&path))
+                            .with_context(|| format!("Unable to find config file {:?}", path))?;
+                        let config: RedirectConfig<String> = RedirectConfig::from_config_file(
+                            serde_json::from_str(&content)
+                                .with_context(|| format!("Unable to parse config {path}"))?,
+                        )
+                        .map_err(anyhow::Error::msg)?;
+                        Some(config)
+                    }
+                }
+            } else {
+                None
+            };
+            let ExternalParser {
+                enabled,
+                substitutions_to_inherit,
+                prefix,
+                config: _,
+            } = redirect_config;
+            Ok((
+                url,
+                ExternalParser {
                     enabled,
                     substitutions_to_inherit,
                     prefix,
-                    config: _,
-                } = redirect_config;
-                Ok((
-                    url,
-                    ExternalParser {
-                        enabled,
-                        substitutions_to_inherit,
-                        prefix,
-                        config,
-                    },
-                ))
-            }),
-    )
-    .await
-    .into_iter()
-    .collect();
+                    config,
+                },
+            ))
+        })
+        .collect();
     Ok(Config {
         fallback,
         behavior,
@@ -230,9 +221,8 @@ async fn load_fetch_and_parse_configs(
     })
 }
 
-async fn load_config(config_path: &Path) -> anyhow::Result<Arc<CommonAppState>> {
+fn load_config(config_path: &Path) -> anyhow::Result<Arc<CommonAppState>> {
     load_fetch_and_parse_configs(config_path)
-        .await
         .and_then(|x| CommonAppState::new(x).context("Unable to create state"))
         .map(Arc::new)
 }
@@ -253,8 +243,8 @@ fn config_watcher(
                     .any(|x| x.extension().map(|x| x == "json").unwrap_or(false))
                 {
                     Runtime::new()
-                        .map(|x| {
-                            let new_parser = x.block_on(load_config(&path));
+                        .map(|_| {
+                            let new_parser = load_config(&path);
                             match new_parser {
                                 Ok(new_parser) => {
                                     let mut parser = state.write().unwrap();
@@ -294,7 +284,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = <Cli as clap::Parser>::parse();
     eprintln!("Starting with following parameters {:#?}", cli);
 
-    let parser = Arc::new(RwLock::new(load_config(&cli.link_config).await?));
+    let parser = Arc::new(RwLock::new(load_config(&cli.link_config)?));
     let last_parsing_error = Arc::new(RwLock::new(Arc::new(None)));
 
     let _watcher = config_watcher(
