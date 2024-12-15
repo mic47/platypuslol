@@ -72,10 +72,12 @@ fn debug(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Respo
     Ok(not_found())
 }
 
-fn suggest(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Response<Body>> {
-    let p = query_params(&req);
+fn suggest(
+    query_params: &HashMap<String, String>,
+    state: Arc<CommonAppState>,
+) -> anyhow::Result<Option<serde_json::Value>> {
     let mut suggestions_left: i32 = 20; // TODO: configure
-    if let Some(query) = p.get("q") {
+    if let Some(query) = query_params.get("q") {
         let (parsed, suggested) = state.parser.parse_full_and_suggest(query);
         let mut suggested_queries: Vec<String> = vec![];
         let mut suggested_texts: Vec<String> = vec![];
@@ -120,12 +122,14 @@ fn suggest(req: Request<Body>, state: Arc<CommonAppState>) -> anyhow::Result<Res
                 break;
             }
         }
-        let response =
+
+        Ok(Some(
             serde_json::to_value((query, suggested_queries, suggested_texts, suggested_urls))
-                .context("Unable to serialize suggestions")?;
-        return to_string_response(response, ContentType::SuggestionsJson);
+                .context("Unable to serialize suggestions")?,
+        ))
+    } else {
+        Ok(None)
     }
-    Ok(not_found())
 }
 
 fn query_params(req: &Request<Body>) -> HashMap<String, String> {
@@ -1055,6 +1059,7 @@ fn route(
     let path = path.strip_suffix('/').unwrap_or(path);
     let state: Arc<CommonAppState> = { state.read().unwrap().clone() };
     let last_parsing_error: LastParsingError = { last_parsing_error.read().unwrap().clone() };
+    let req_query_params = query_params(&req);
     Ok((match (method, path) {
         (&Method::GET, "") | (&Method::GET, "/install") => templated_string_response(
             INSTALL_INSTRUCTIONS.into(),
@@ -1070,7 +1075,13 @@ fn route(
         (&Method::GET, "/config") => config(req, state, last_parsing_error),
         (&Method::GET, "/debug") => debug(req, state),
         (&Method::GET, "/redirect") => redirect(req, state, last_parsing_error),
-        (&Method::GET, "/suggest") => suggest(req, state),
+        (&Method::GET, "/suggest") => suggest(&req_query_params, state).and_then(|maybe_json| {
+            if let Some(json) = maybe_json {
+                to_string_response(json, ContentType::SuggestionsJson)
+            } else {
+                Ok(not_found())
+            }
+        }),
         (_, path) => {
             if let Some(icon) = ICONS.get(&path) {
                 bytes_response(icon.clone(), ContentType::Png)
