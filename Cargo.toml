@@ -6,6 +6,7 @@ members = [
   "redirect",
   "tool",
   "server",
+  "web-redirector",
 ]
 
 [workspace.package]
@@ -16,6 +17,7 @@ version = "0.0.0"
 nfa = { path="nfa" }
 redirect = { path = "redirect" }
 tool = { path = "tool" }
+web-redirector = { path = "web-redirector" }
 server = { path = "server" }
 
 anyhow = "1.0.94"
