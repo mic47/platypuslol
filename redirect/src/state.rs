@@ -64,10 +64,6 @@ impl CommonAppState {
                     ConfigUrl::Builtin { path: _ } | ConfigUrl::Local { path: _ } => {
                         parsers.push(maybe_parser?);
                     }
-                    ConfigUrl::Remote { url: _ } => match maybe_parser {
-                        Ok(parser) => parsers.push(parser),
-                        Err(err) => eprintln!("{}", err),
-                    },
                 }
             }
         }

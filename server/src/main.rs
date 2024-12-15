@@ -8,7 +8,7 @@ use anyhow::Context;
 use hyper::body::Buf;
 use hyper::http::HeaderValue;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 
 use redirect::{CommonAppState, Config, ConfigUrl, ExternalParser, RedirectConfig};
@@ -197,37 +197,6 @@ async fn load_fetch_and_parse_configs(
                             )
                             .map_err(anyhow::Error::msg)?;
                             Some(config)
-                        }
-                        ConfigUrl::Remote { url } => {
-                            let fun = || async {
-                                let client = Client::new();
-                                let res =
-                                    client
-                                        .get(url.parse::<Uri>().with_context(|| {
-                                            format!("Unable to parse url {}", url)
-                                        })?)
-                                        .await?;
-                                if !res.status().is_success() {
-                                    Err(anyhow::anyhow!(
-                                        "Received bas status {:?} when processing {}",
-                                        res.status(),
-                                        url
-                                    ))?
-                                }
-                                let body = hyper::body::aggregate(res).await.context("TODO")?;
-                                let config: RedirectConfig<String> =
-                                    RedirectConfig::from_config_file(
-                                        serde_json::from_reader(body.reader()).context("TODO")?,
-                                    )
-                                    .map_err(anyhow::Error::msg)?;
-                                anyhow::Ok(config)
-                            };
-                            fun()
-                                .await
-                                .map_err(|err| {
-                                    eprintln!("Unable to fetch & parse external config {err}")
-                                })
-                                .ok()
                         }
                     }
                 } else {
