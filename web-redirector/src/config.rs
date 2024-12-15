@@ -14,14 +14,18 @@ lazy_static::lazy_static! {
     ]);
 }
 
-pub fn load_config(config_path: &Path) -> anyhow::Result<Arc<CommonAppState>> {
-    load_fetch_and_parse_configs(config_path)
+pub fn load_config<F: Fn(&Path) -> std::io::Result<String>>(
+    config_path: &Path,
+    read_to_string: F,
+) -> anyhow::Result<Arc<CommonAppState>> {
+    load_fetch_and_parse_configs(config_path, read_to_string)
         .and_then(|x| CommonAppState::new(x).context("Unable to create state"))
         .map(Arc::new)
 }
 
-fn load_fetch_and_parse_configs(
+fn load_fetch_and_parse_configs<F: Fn(&Path) -> std::io::Result<String>>(
     config_path: &Path,
+    read_to_string: F,
 ) -> anyhow::Result<Config<String, RedirectConfig<String>>> {
     // TODO: make sure error messages have line numbers / serde path
     let Config::<String, ()> {
@@ -31,7 +35,7 @@ fn load_fetch_and_parse_configs(
         external_configurations,
     } = Config::<String, ()>::from_config_file(
         serde_json::from_str(
-            &std::fs::read_to_string(config_path)
+            &read_to_string(config_path)
                 .with_context(|| format!("Unable to find config file {:?}", config_path))?,
         )
         .context("Unable to parse config.")?,
@@ -65,7 +69,7 @@ fn load_fetch_and_parse_configs(
                     }
                     ConfigUrl::Local { path } => {
                         let parent = config_path.parent().unwrap_or(config_path);
-                        let content = std::fs::read_to_string(parent.join(&path))
+                        let content = read_to_string(&parent.join(&path))
                             .with_context(|| format!("Unable to find config file {:?}", path))?;
                         let config: RedirectConfig<String> = RedirectConfig::from_config_file(
                             serde_json::from_str(&content)
