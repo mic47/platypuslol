@@ -1,0 +1,21 @@
+[package]
+name = "cf-http-worker"
+version = "0.1.0"
+edition = "2021"
+authors = [ "Michal Nánási <michal.nanasi@gmail.com>" ]
+
+[package.metadata.release]
+release = false
+
+# https://github.com/rustwasm/wasm-pack/issues/1247
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+worker.workspace = true
+worker-macros.workspace = true
+console_error_panic_hook.workspace = true
+http.workspace = true
