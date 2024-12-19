@@ -44,4 +44,8 @@ restart: FORCE
 logs: FORCE
 	 journalctl --user -u platypus-lol.service
 
+cf-dev: FORCE
+	bash -c 'pushd cf-http-worker && npx wrangler dev ; popd'
+         
+
 FORCE:
