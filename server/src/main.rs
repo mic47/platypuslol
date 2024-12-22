@@ -1,18 +1,24 @@
-use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use anyhow::Context;
+use http_body_util::Full;
+use hyper::body::{Body, Bytes, Incoming};
 use hyper::http::HeaderValue;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Method, Request, Response, StatusCode};
+use hyper_util::rt::TokioIo;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 
 use redirect::CommonAppState;
+use tokio::net::TcpListener;
 use tokio::runtime::Runtime;
-use web_redirector::{load_config, route_get, ContentType, LastParsingError, ServerResponse};
+use web_redirector::{
+    load_config, query_params, route_get, ContentType, LastParsingError, ServerResponse,
+};
 
 #[derive(Clone, Debug, clap::Parser)]
 struct Cli {
@@ -23,23 +29,12 @@ struct Cli {
     pub port: u16,
 }
 
-fn query_params(req: &Request<Body>) -> HashMap<String, String> {
-    req.uri()
-        .query()
-        .map(|v| {
-            url::form_urlencoded::parse(v.as_bytes())
-                .into_owned()
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn route(
-    req: Request<Body>,
+fn route<T: Body>(
+    req: Request<T>,
     state: Arc<RwLock<Arc<CommonAppState>>>,
     last_parsing_error: Arc<RwLock<LastParsingError>>,
     server_uri: String,
-) -> Result<Response<Body>, Infallible> {
+) -> Result<Response<Full<Bytes>>, Infallible> {
     let method = req.method();
     let path = req.uri().path();
     let path = path.strip_suffix('/').unwrap_or(path);
@@ -80,34 +75,37 @@ fn from_content_type(value: ContentType) -> anyhow::Result<HeaderValue> {
         ContentType::OpenSearchDescription => "application/opensearchdescription+xml",
         ContentType::Png => "image/png",
     })
-    .context("Unable to convert redirect to location")
+    .context("Unable ko convert redirect to location")
 }
 
 fn to_string_response<T: ToString>(
     value: T,
     content_type: ContentType,
-) -> anyhow::Result<Response<Body>> {
-    let (mut parts, _) = Response::<Body>::default().into_parts();
+) -> anyhow::Result<Response<Full<Bytes>>> {
+    let (mut parts, _) = Response::<Full<Bytes>>::default().into_parts();
     parts.headers.insert(
         hyper::header::CONTENT_TYPE,
         from_content_type(content_type)?,
     );
-    let body = Body::from(value.to_string());
+    let body = Full::new(Bytes::from(value.to_string()));
     Ok(Response::from_parts(parts, body))
 }
 
-fn bytes_response(value: Vec<u8>, content_type: ContentType) -> anyhow::Result<Response<Body>> {
-    let (mut parts, _) = Response::<Body>::default().into_parts();
+fn bytes_response(
+    value: Vec<u8>,
+    content_type: ContentType,
+) -> anyhow::Result<Response<Full<Bytes>>> {
+    let (mut parts, _) = Response::<Full<Bytes>>::default().into_parts();
     parts.headers.insert(
         hyper::header::CONTENT_TYPE,
         from_content_type(content_type)?,
     );
-    let body = Body::from(value);
+    let body = Full::new(Bytes::from(value));
     Ok(Response::from_parts(parts, body))
 }
 
-fn redirect_response(target: String) -> anyhow::Result<Response<Body>> {
-    let (mut parts, body) = Response::<Body>::default().into_parts();
+fn redirect_response(target: String) -> anyhow::Result<Response<Full<Bytes>>> {
+    let (mut parts, body) = Response::<Full<Bytes>>::default().into_parts();
     parts
         .headers
         .insert(hyper::header::LOCATION, HeaderValue::from_str(&target)?);
@@ -115,16 +113,16 @@ fn redirect_response(target: String) -> anyhow::Result<Response<Body>> {
     Ok(Response::from_parts(parts, body))
 }
 
-fn not_found() -> Response<Body> {
-    let (mut parts, body) = Response::<Body>::default().into_parts();
+fn not_found() -> Response<Full<Bytes>> {
+    let (mut parts, body) = Response::<Full<Bytes>>::default().into_parts();
     parts.status = StatusCode::NOT_FOUND;
     Response::from_parts(parts, body)
 }
 
-fn internal_server_error<T: ToString>(error: T) -> Response<Body> {
-    let (mut parts, _) = Response::<Body>::default().into_parts();
+fn internal_server_error<T: ToString>(error: T) -> Response<Full<Bytes>> {
+    let (mut parts, _) = Response::<Full<Bytes>>::default().into_parts();
     parts.status = StatusCode::INTERNAL_SERVER_ERROR;
-    let body = Body::from(error.to_string());
+    let body = Full::new(Bytes::from(error.to_string()));
     Response::from_parts(parts, body)
 }
 
@@ -199,32 +197,44 @@ async fn main() -> anyhow::Result<()> {
     let default_server = format!("localhost:{}", cli.port);
     let default_protocol = "http://";
 
-    let make_svc = make_service_fn(move |_conn| {
+    let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
+    let listener = TcpListener::bind(addr).await?;
+    loop {
+        let (stream, _) = listener.accept().await?;
+        let io = TokioIo::new(stream);
         let parser = parser.clone();
         let last_parsing_error = last_parsing_error.clone();
         let default_server = default_server.clone();
-        async move {
-            Ok::<_, Infallible>(service_fn(move |req| {
-                let parser = parser.clone();
-                let last_parsing_error = last_parsing_error.clone();
-                let default_server = default_server.clone();
-                let server_uri = format!(
-                    "{default_protocol}{}",
-                    req.headers()
-                        .get("Host")
-                        .and_then(|x| x.to_str().ok())
-                        .unwrap_or(&default_server)
-                );
-                async { route(req, parser, last_parsing_error, server_uri) }
-            }))
-        }
-    });
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
+        let serve = move |req: Request<Incoming>| {
+            let parser = parser.clone();
+            let last_parsing_error = last_parsing_error.clone();
+            let default_server = default_server.clone();
+            let server_uri = format!(
+                "{default_protocol}{}",
+                req.headers()
+                    .get("Host")
+                    .and_then(|x| x.to_str().ok())
+                    .unwrap_or(&default_server)
+            );
+            async { route(req, parser, last_parsing_error, server_uri) }
+        };
+        tokio::task::spawn(async move {
+            // Finally, we bind the incoming connection to our `hello` service
+            if let Err(err) = http1::Builder::new()
+                // `service_fn` converts our function in a `Service`
+                .serve_connection(io, service_fn(serve))
+                .await
+            {
+                eprintln!("Error serving connection: {:?}", err);
+            }
+        });
+    }
+    /*
     let server = Server::bind(&addr).serve(make_svc);
 
     if let Err(e) = server.await {
         eprintln!("server error: {}", e);
     }
     Ok(())
+    */
 }

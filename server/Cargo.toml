@@ -9,16 +9,20 @@ name = "platypus-lol"
 path = "src/main.rs"
 
 [dependencies]
+nfa.workspace = true
+redirect.workspace = true
+web-redirector.workspace = true
+
 anyhow.workspace = true
 futures-util.workspace = true
 html-builder.workspace = true
-nfa.workspace = true
 notify.workspace = true
-redirect.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-web-redirector.workspace = true
+http.workspace = true
+http-body-util.workspace = true
 hyper.workspace = true
+hyper-util.workspace = true
 tokio.workspace = true
 clap.workspace = true
 url.workspace = true

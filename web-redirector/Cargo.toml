@@ -8,11 +8,13 @@ name = "web_redirector"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+nfa.workspace = true
+redirect.workspace = true
+
 anyhow.workspace = true
 futures-util.workspace = true
 html-builder.workspace = true
-nfa.workspace = true
-redirect.workspace = true
+http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 url.workspace = true

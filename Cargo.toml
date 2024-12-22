@@ -24,7 +24,10 @@ anyhow = "1.0.94"
 clap = { version = "4.5.23", features = ["derive"]}
 futures-util = "0.3.31"
 html-builder = "0.5.1"
-hyper = { version = "0.14", features = ["full"]}
+http = "1.1"
+http-body-util = "0.1.2"
+hyper = { version = "1.5.2", features = ["full"]}
+hyper-util = { version = "0.1", features = ["full"]}
 itertools = "0.13.0"
 lazy_static = "1.5.0"
 notify = { version = "6.1.1", default-features = false, features = ["macos_kqueue"] }
