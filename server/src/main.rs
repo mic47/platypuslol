@@ -68,14 +68,7 @@ fn route<T: Body>(
 }
 
 fn from_content_type(value: ContentType) -> anyhow::Result<HeaderValue> {
-    HeaderValue::from_str(match value {
-        ContentType::Json => "application/json",
-        ContentType::SuggestionsJson => "application/x-suggestions+json",
-        ContentType::Html => "text/html",
-        ContentType::OpenSearchDescription => "application/opensearchdescription+xml",
-        ContentType::Png => "image/png",
-    })
-    .context("Unable ko convert redirect to location")
+    HeaderValue::from_str(value.to_str()).context("Unable ko convert redirect to location")
 }
 
 fn to_string_response<T: ToString>(

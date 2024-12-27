@@ -143,8 +143,13 @@ checksum = "d32a725bc159af97c3e629873bb9f88fb8cf8a4867175f76dc987815ea07c83b"
 name = "cf-http-worker"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "console_error_panic_hook",
  "http",
+ "nfa",
+ "redirect",
+ "url",
+ "web-redirector",
  "worker",
  "worker-macros",
 ]
