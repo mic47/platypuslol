@@ -46,7 +46,7 @@ async fn fetch(req: HttpRequest, _env: Env, _ctx: Context) -> Result<Response> {
             let params: HashMap<String, String> = query_params(&req);
             let method = req.method().clone();
             let (head, _body) = req.into_parts();
-            let path = head.uri.path();
+            let path = head.uri.path().trim_end_matches('/');
             let response = match method {
                 http::Method::GET => {
                     route_get(
@@ -54,7 +54,11 @@ async fn fetch(req: HttpRequest, _env: Env, _ctx: Context) -> Result<Response> {
                         path,
                         params,
                         Arc::new(None), // TODO fill this
-                        head.uri.host().unwrap_or_default().into(),
+                        format!(
+                            "{}://{}",
+                            head.uri.scheme_str().unwrap_or("http"),
+                            head.uri.host().unwrap_or_default(),
+                        ),
                     )
                     .map(|x| {
                         match x {
