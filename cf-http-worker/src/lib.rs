@@ -14,7 +14,7 @@ lazy_static::lazy_static! {
   \"fallback\": {
     \"link\": \"https://www.google.com/search?q={query}\",
     \"query_prefix\": \"search google\",
-    \"redirect_automatically\": true
+    \"redirect_automatically\": false
   },
   \"external_configurations\": {
     \"builtin://commands/google.json\": {
