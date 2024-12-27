@@ -47,5 +47,7 @@ logs: FORCE
 cf-dev: FORCE
 	bash -c 'pushd cf-http-worker && npx wrangler dev ; popd'
          
+cf-deploy: FORCE
+	bash -c 'pushd cf-http-worker && npx wrangler deploy ; popd'
 
 FORCE:
