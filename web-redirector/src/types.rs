@@ -8,6 +8,18 @@ pub enum ContentType {
     Png,
 }
 
+impl ContentType {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            ContentType::Json => "application/json",
+            ContentType::SuggestionsJson => "application/x-suggestions+json",
+            ContentType::Html => "text/html",
+            ContentType::OpenSearchDescription => "application/opensearchdescription+xml",
+            ContentType::Png => "image/png",
+        }
+    }
+}
+
 pub enum ServerResponse {
     NotFound,
     Json(serde_json::Value),
