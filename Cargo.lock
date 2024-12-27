@@ -146,6 +146,7 @@ dependencies = [
  "anyhow",
  "console_error_panic_hook",
  "http",
+ "lazy_static",
  "nfa",
  "redirect",
  "url",
