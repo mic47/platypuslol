@@ -31,7 +31,7 @@ http = "1.1"
 http-body-util = "0.1.2"
 hyper = { version = "1.5.2", features = ["full"]}
 hyper-util = { version = "0.1", features = ["full"]}
-itertools = "0.13.0"
+itertools = "0.14.0"
 lazy_static = "1.5.0"
 notify = { version = "6.1.1", default-features = false, features = ["macos_kqueue"] }
 serde = { version = "1.0.216" , features = ["derive"] }
