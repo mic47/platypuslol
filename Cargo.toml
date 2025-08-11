@@ -23,7 +23,7 @@ web-redirector = { path = "web-redirector" }
 server = { path = "server" }
 
 anyhow = "1.0.95"
-clap = { version = "4.5.31", features = ["derive"]}
+clap = { version = "4.5.43", features = ["derive"]}
 console_error_panic_hook = { version = "0.1.1" }
 futures-util = "0.3.31"
 html-builder = "0.5.1"
