@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
-      - run: rustup component add rustfmt
+      - run: rustup component add rustfmt clippy
       - run: make ci
       - run: git diff --exit-code
       - run: echo "🍏 This job's status is ${{ job.status }}."
